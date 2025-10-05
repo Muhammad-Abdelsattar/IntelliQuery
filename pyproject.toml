@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sql-agent-toolkit"
+version = "0.1.0"
+description = "A self-contained, installable agent for converting natural language to SQL queries."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    # "simple-llm-interface>=0.1.0",
+    # "pandas>=2.0.0",
+    # "SQLAlchemy>=2.0.0",
+    # "sqlparse>=0.4.0",
+    # "langgraph>=0.0.30",
+    # # Required by langchain_community used in database service
+    # "langchain-community>=0.0.32"
+]
+
+[project.urls]
+Homepage = "https://github.com/your-username/sql-agent-toolkit"
+Issues = "https://github.com/your-username/sql-agent-toolkit/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+sql_agent_toolkit = ["prompts/*"]
