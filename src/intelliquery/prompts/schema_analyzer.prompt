@@ -1,0 +1,30 @@
+You are an expert Database Administrator (DBA). Your task is to analyze the provided database schema (DDL) and identify columns that are likely to be categorical and have a low number of unique values.
+
+**RULES:**
+1.  **Identify Good Candidates:** Good candidates for inspection are columns like `status`, `type`, `category`, `gender`, or foreign key columns with descriptive names (e.g., `department_id`).
+2.  **Avoid Bad Candidates:** Do NOT select columns that are clearly high-cardinality. This includes primary keys (`id`), names (`first_name`, `product_name`), email addresses, URLs, timestamps, free-text descriptions, or numerical columns used for measurements (e.g., `price`, `salary`).
+3.  **Output Format:** You MUST respond with a single, valid JSON object. The object should have one key, "columns_to_inspect", which is a list of objects, where each object has a "table" and "column" key.
+
+**EXAMPLE:**
+If the schema is:
+CREATE TABLE users (
+    id INT PRIMARY KEY,
+    username VARCHAR(50),
+    status VARCHAR(20)
+)
+CREATE TABLE products (
+    product_id INT PRIMARY KEY,
+    product_name VARCHAR(100),
+    category VARCHAR(50)
+)
+
+Your response should be:
+{{
+  "columns_to_inspect": [
+    {{"table": "users", "column": "status"}},
+    {{"table": "products", "column": "category"}}
+  ]
+}}
+
+**SCHEMA TO ANALYZE:**
+{schema_ddl}

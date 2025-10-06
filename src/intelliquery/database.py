@@ -2,16 +2,22 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+import logging
+import hashlib
 
 import pandas as pd
 import sqlparse
 from langchain_community.utilities.sql_database import SQLDatabase
 
 from sqlalchemy import create_engine, inspect
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from .exceptions import DatabaseConnectionError
+from .caching import CacheProvider, InMemoryCacheProvider
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseConnectionStrategy(ABC):
@@ -78,36 +84,33 @@ class DatabaseService:
     and robust query execution for internal use.
     """
 
+    CARDINALITY_LIMIT = 25  # The safety limit for fetching distinct values
+
     def __init__(
         self,
         strategy: DatabaseConnectionStrategy,
         include_tables: Optional[List[str]] = None,
         sample_rows_in_table_info: int = 3,
+        cache_provider: Optional[CacheProvider] = None,  # NEW: Accept a cache provider
     ):
         try:
             self._engine: Engine = create_engine(strategy.get_uri())
-
-            # If no specific tables are provided, discover them automatically.
-            if not include_tables:
-                inspector = inspect(self._engine)
-                discovered_tables = inspector.get_table_names()
-                print(f"[DatabaseService] Auto-discovered tables: {discovered_tables}")
-                tables_to_use = discovered_tables
-            else:
-                tables_to_use = include_tables
-
             self._langchain_db = SQLDatabase(
                 engine=self._engine,
                 sample_rows_in_table_info=sample_rows_in_table_info,
-                # Use the discovered list of tables for schema generation
-                include_tables=tables_to_use,
+                include_tables=include_tables,
             )
             self.dialect = self._langchain_db.dialect
+            # NEW: Default to in-memory cache if none is provided
+            self.cache = (
+                cache_provider
+                if cache_provider is not None
+                else InMemoryCacheProvider()
+            )
         except Exception as e:
             raise DatabaseConnectionError(
-                f"Failed to connect or inspect the database: {e}"
+                f"Failed to connect to the database: {e}"
             ) from e
-
 
     @classmethod
     def from_config(
@@ -140,6 +143,44 @@ class DatabaseService:
         """Gets all necessary context (schema, tables) for a prompt template."""
         return {**self._langchain_db.get_context(), "database_dialect": self.dialect}
 
+    def get_raw_schema_and_key(self) -> Tuple[str, str]:
+        """
+        Gets the raw schema DDL and computes a stable SHA256 hash to use as a cache key.
+        """
+        raw_schema = self._langchain_db.get_table_info()
+        schema_key = hashlib.sha256(raw_schema.encode()).hexdigest()
+        return raw_schema, schema_key
+
+    def fetch_distinct_values(
+        self, tables_and_columns: List[Dict[str, str]]
+    ) -> Dict[str, List[Any]]:
+        """
+        Safely fetches distinct values for a list of user-specified columns.
+        """
+        distinct_values = {}
+        limit = self.CARDINALITY_LIMIT + 1
+
+        with self._engine.connect() as connection:
+            for item in tables_and_columns:
+                table = item["table"]
+                column = item["column"]
+                key = f"{table}.{column}"
+
+                try:
+                    # Note: Identifier quoting is important for different SQL dialects
+                    query = f'SELECT DISTINCT "{column}" FROM "{table}" LIMIT {limit}'
+                    result = connection.execute(text(query)).fetchall()
+
+                    if len(result) >= limit:
+                        distinct_values[key] = "TOO_MANY_VALUES"
+                    else:
+                        distinct_values[key] = [row[0] for row in result]
+                except Exception as e:
+                    logger.warning(f"Could not fetch distinct values for {key}: {e}")
+                    distinct_values[key] = "ERROR_FETCHING"
+
+        return distinct_values
+
     def validate_sql(self, sql_query: str) -> None:
         """
         Validates an SQL query using the EXPLAIN command without executing it.
@@ -155,9 +196,6 @@ class DatabaseService:
             raise ValueError("The SQL query is empty or invalid.")
 
         try:
-            # Using text() is a safer way to execute raw SQL with SQLAlchemy
-            from sqlalchemy.sql import text
-
             with self._engine.connect() as connection:
                 connection.execute(text(f"EXPLAIN {sql_query}"))
         except SQLAlchemyError as e:
@@ -167,7 +205,6 @@ class DatabaseService:
         """
         Executes a read-only SQL query and returns results as a pandas DataFrame.
         """
-        from sqlalchemy.sql import text
 
         try:
             with self._engine.connect() as connection:

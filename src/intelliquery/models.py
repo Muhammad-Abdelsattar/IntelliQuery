@@ -9,6 +9,24 @@ from typing_extensions import TypedDict
 # Public Interface Models
 
 
+class EnrichedDatabaseContext(BaseModel):
+    """
+    A structured, pre-built context object containing all information
+    needed for an agent to generate a query.
+    """
+
+    raw_schema: str = Field(..., description="The original, unmodified DDL schema.")
+    augmented_schema: str = Field(
+        ..., description="The schema augmented with distinct values and annotations."
+    )
+    schema_key: str = Field(
+        ..., description="The hash of the raw schema, used for caching."
+    )
+    business_context: Optional[str] = Field(
+        None, description="User-provided business rules and definitions."
+    )
+
+
 class SQLPlan(BaseModel):
     """
     Represents the output of the planning phase (SQL generation).
@@ -82,17 +100,31 @@ class LLM_SQLResponse(BaseModel):
     )
 
 
+class ColumnToInspect(BaseModel):
+    """A Pydantic model for a single column identified for enrichment."""
+
+    table: str = Field(..., description="The name of the table.")
+    column: str = Field(
+        ..., description="The name of the column to inspect for unique values."
+    )
+
+
+class InspectionPlan(BaseModel):
+    """The structured plan produced by the schema analyzer LLM call."""
+
+    columns_to_inspect: List[ColumnToInspect]
+
+
 class SQLAgentState(TypedDict):
     """
     Represents the internal, temporary state of the SQL Agent's workflow.
-    This state is created at the start of a `run` and destroyed at the end.
+    This is now simpler, as the complex context is pre-built.
     """
 
     # Inputs
     natural_language_question: str
     chat_history: List[Tuple[str, str]]
-    db_context: Dict[str, Any]
-    business_context: Optional[str]
+    db_context: Dict[str, Any]  # This will now hold the pre-built augmented context
 
     # Internal loop state
     history: List[str]
@@ -102,7 +134,7 @@ class SQLAgentState(TypedDict):
     # The structured result from the generation LLM
     generation_result: Optional[LLM_SQLResponse]
 
-    # Final Outputs
+    # Outputs
     final_dataframe: Optional[pd.DataFrame]
     generated_sql: str
     error: Optional[str]
