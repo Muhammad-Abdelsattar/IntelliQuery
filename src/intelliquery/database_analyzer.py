@@ -1,3 +1,4 @@
+import re
 import json
 import logging
 from typing import Optional, Dict, List, Any
@@ -17,9 +18,15 @@ class DBContextAnalyzer:
     This encapsulates the logic of analyzing, fetching, and synthesizing context.
     """
 
-    def __init__(self, llm_interface: LLMInterface, db_service: DatabaseService):
+    def __init__(
+        self,
+        llm_interface: LLMInterface,
+        db_service: DatabaseService,
+        max_values: int = 15,
+    ):
         self.llm_interface = llm_interface
         self.db_service = db_service
+        self.max_values = max_values
 
         prompts_base_path = importlib.resources.files("intelliquery") / "prompts"
         self.prompt_provider = FileSystemPromptProvider(base_path=prompts_base_path)
@@ -27,29 +34,135 @@ class DBContextAnalyzer:
     def _synthesize_augmented_schema(
         self, raw_schema: str, fetched_values: Dict[str, List[Any]]
     ) -> str:
-        """Combines the raw DDL with fetched distinct values into an augmented schema."""
-        lines = raw_schema.split("\n")
+        """
+        Augments the DDL schema with inline comments showing possible values for categorical columns.
+        Handles multiple SQL identifier quoting styles: "table", `table`, [table], and unquoted.
+        """
+        lines = raw_schema.strip().split("\n")
         augmented_lines = []
-        current_table = ""
 
+        # Simple regex pattern to match any SQL identifier
+        IDENTIFIER = r'(?:"([^"]+)"|`([^`]+)`|$$([^$$]+)\]|(\w+))'
+
+        # Pattern to detect CREATE TABLE statements
+        table_pattern = re.compile(
+            rf"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+            rf"(?:{IDENTIFIER}\.)?"  # Optional schema prefix
+            rf"{IDENTIFIER}",  # Table name
+            re.IGNORECASE,
+        )
+
+        # Pattern to detect column definitions (indented lines with identifier + data type)
+        column_pattern = re.compile(
+            rf"^\s+"  # Leading whitespace
+            rf"{IDENTIFIER}"  # Column name
+            rf"\s+"
+            rf"[A-Z][\w()]*",  # Data type
+            re.IGNORECASE,
+        )
+
+        # Keywords that indicate constraint lines (not column definitions)
+        CONSTRAINT_KEYWORDS = {
+            "PRIMARY",
+            "FOREIGN",
+            "UNIQUE",
+            "CHECK",
+            "CONSTRAINT",
+            "KEY",
+        }
+
+        def extract_identifier(groups: tuple) -> Optional[str]:
+            """Extract identifier from regex groups (handles all quote styles)."""
+            return next((g for g in groups if g), None)
+
+        def is_constraint_line(line: str) -> bool:
+            """Check if this is a constraint line rather than a column definition."""
+            stripped = line.strip().upper()
+            return any(stripped.startswith(kw) for kw in CONSTRAINT_KEYWORDS)
+
+        def format_values(values: Any) -> str:
+            """Format values into a readable comment string."""
+            if isinstance(values, list):
+                if len(values) <= self.max_values:
+                    formatted = [
+                        f"'{v}'" if isinstance(v, str) else str(v) for v in values
+                    ]
+                    return f"Possible values: {', '.join(formatted)}"
+                else:
+                    formatted = [
+                        f"'{v}'" if isinstance(v, str) else str(v) for v in values[:8]
+                    ]
+                    return f"Possible values: {', '.join(formatted)} ... (+{len(values) - 8} more)"
+            elif values == "TOO_MANY_VALUES":
+                return "Too many distinct values"
+            else:
+                return str(values)
+
+        # Track current table context
+        current_table: Optional[str] = None
+
+        # Process each line
         for line in lines:
+            # Check if this is a CREATE TABLE line
+            table_match = table_pattern.search(line)
+            if table_match:
+                # Extract table name (last 4 groups are the table identifier)
+                current_table = extract_identifier(table_match.groups()[-4:])
+                augmented_lines.append(line)
+                logger.debug(f"Entered table context: {current_table}")
+                continue
+
+            # If we're in a table and this looks like a column definition
+            if current_table and not is_constraint_line(line):
+                col_match = column_pattern.match(line)
+
+                if col_match:
+                    # Extract column name (first 4 groups)
+                    col_name = extract_identifier(col_match.groups()[:4])
+
+                    if col_name:
+                        # Check if we have metadata for this column
+                        key = f"{current_table}.{col_name}"
+
+                        if key in fetched_values:
+                            # Add comment with values
+                            comment = f" -- {format_values(fetched_values[key])}"
+                            augmented_lines.append(line.rstrip() + comment)
+                            logger.debug(f"Added comment for {key}")
+                            continue
+
+            # Default: add line as-is
             augmented_lines.append(line)
-            if "CREATE TABLE" in line and '"' in line:
-                current_table = line.split('"')[1]
-
-            for key, values in fetched_values.items():
-                table, column = key.split(".")
-                if table == current_table and f'"{column}"' in line:
-                    comment = ""
-                    if isinstance(values, list):
-                        comment = f" -- Possible values: {values}"
-                    elif values == "TOO_MANY_VALUES":
-                        comment = " -- (Too many distinct values to display)"
-
-                    if comment:
-                        augmented_lines[-1] = line.rstrip() + comment
 
         return "\n".join(augmented_lines)
+
+    # def _synthesize_augmented_schema(
+    #     self, raw_schema: str, fetched_values: Dict[str, List[Any]]
+    # ) -> str:
+    #     """Combines the raw DDL with fetched distinct values into an augmented schema."""
+    #     lines = raw_schema.split("\n")
+    #     augmented_lines = []
+    #     current_table = ""
+    #     print(fetched_values)
+    #
+    #     for line in lines:
+    #         augmented_lines.append(line)
+    #         if "CREATE TABLE" in line and '"' in line:
+    #             current_table = line.split('"')[1]
+    #
+    #         for key, values in fetched_values.items():
+    #             table, column = key.split(".")
+    #             if table == current_table and f'"{column}"' in line:
+    #                 comment = ""
+    #                 if isinstance(values, list):
+    #                     comment = f" -- Possible values: {values}"
+    #                 elif values == "TOO_MANY_VALUES":
+    #                     comment = " -- (Too many distinct values to display)"
+    #
+    #                 if comment:
+    #                     augmented_lines[-1] = line.rstrip() + comment
+    #
+    #     return "\n".join(augmented_lines)
 
     def build_context(
         self, business_context: Optional[str] = None
