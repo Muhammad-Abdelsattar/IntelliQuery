@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Literal
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class EnrichedDatabaseContext(BaseModel):
     """
@@ -63,5 +63,4 @@ class SQLResult(BaseModel):
         None, description="Details of the error if any step in the process failed."
     )
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)

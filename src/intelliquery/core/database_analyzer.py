@@ -158,7 +158,9 @@ class DBContextAnalyzer:
         )
 
         # Cache Miss: Analyze the schema with an LLM
-        analyzer_prompt = self.prompt_provider.get_template(os.path.join("context_analyzer", "schema_analyzer.prompt"))
+        analyzer_prompt = self.prompt_provider.get_template(
+            os.path.join("context_analyzer", "schema_analyzer.prompt")
+        )
         try:
             plan = self.llm_interface.generate_structured(
                 system_prompt=analyzer_prompt,
@@ -167,7 +169,7 @@ class DBContextAnalyzer:
                 response_model=InspectionPlan,
             )
 
-            columns_to_check = [item.dict() for item in plan.columns_to_inspect]
+            columns_to_check = [item.model_dump() for item in plan.columns_to_inspect]
         except Exception as e:
             # raise e
             logger.error(f"Failed to generate a valid inspection plan: {e}")
@@ -188,7 +190,7 @@ class DBContextAnalyzer:
         )
 
         # Save to cache before returning
-        self.db_service.cache.set(full_key, context.json())
+        self.db_service.cache.set(full_key, context.model_dump_json())
         logger.info(f"Saved new context to cache for key: {full_key[:10]}...")
 
         return context

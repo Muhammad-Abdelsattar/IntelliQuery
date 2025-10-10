@@ -60,13 +60,8 @@ class ReflectionWorkflow(BaseWorkflow):
             response_model=ReflectionReview,
         )
 
-        logger.info(f"--- Reviewer decision: {review.decision} ---")
-        print(f"--- Reviewer decision: {review.decision} ---")
         if review.suggestions:
             logger.info(f"--- Reviewer suggestions: {review.suggestions} ---")
-
-            print(f"--- Reviewer decision: {review.decision} ---")
-            print(f"--- Reviewer suggestions: {review.suggestions} ---")
 
         return {
             "review": review.suggestions,
