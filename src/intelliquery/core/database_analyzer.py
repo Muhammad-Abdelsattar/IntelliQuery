@@ -1,3 +1,4 @@
+import os
 import re
 import json
 import logging
@@ -7,7 +8,8 @@ import importlib.resources
 from simple_llm import LLMInterface, FileSystemPromptProvider
 
 from .database import DatabaseService
-from .models import EnrichedDatabaseContext, InspectionPlan
+from ..models.agent_io import InspectionPlan
+from ..models.public import EnrichedDatabaseContext
 
 logger = logging.getLogger(__name__)
 
@@ -136,34 +138,6 @@ class DBContextAnalyzer:
 
         return "\n".join(augmented_lines)
 
-    # def _synthesize_augmented_schema(
-    #     self, raw_schema: str, fetched_values: Dict[str, List[Any]]
-    # ) -> str:
-    #     """Combines the raw DDL with fetched distinct values into an augmented schema."""
-    #     lines = raw_schema.split("\n")
-    #     augmented_lines = []
-    #     current_table = ""
-    #     print(fetched_values)
-    #
-    #     for line in lines:
-    #         augmented_lines.append(line)
-    #         if "CREATE TABLE" in line and '"' in line:
-    #             current_table = line.split('"')[1]
-    #
-    #         for key, values in fetched_values.items():
-    #             table, column = key.split(".")
-    #             if table == current_table and f'"{column}"' in line:
-    #                 comment = ""
-    #                 if isinstance(values, list):
-    #                     comment = f" -- Possible values: {values}"
-    #                 elif values == "TOO_MANY_VALUES":
-    #                     comment = " -- (Too many distinct values to display)"
-    #
-    #                 if comment:
-    #                     augmented_lines[-1] = line.rstrip() + comment
-    #
-    #     return "\n".join(augmented_lines)
-
     def build_context(
         self, business_context: Optional[str] = None
     ) -> EnrichedDatabaseContext:
@@ -184,7 +158,7 @@ class DBContextAnalyzer:
         )
 
         # Cache Miss: Analyze the schema with an LLM
-        analyzer_prompt = self.prompt_provider.get_template("schema_analyzer.prompt")
+        analyzer_prompt = self.prompt_provider.get_template(os.path.join("context_analyzer", "schema_analyzer.prompt"))
         try:
             plan = self.llm_interface.generate_structured(
                 system_prompt=analyzer_prompt,
