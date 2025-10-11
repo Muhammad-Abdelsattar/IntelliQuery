@@ -39,10 +39,8 @@ Install IntelliQuery and its core dependencies using pip. For development, inclu
 
 ```bash
 # For production use
-pip install intelliquery
+pip install "git+https://github.com/Muhammad-Abdelsattar/IntelliQuery.git#egg=intelliquery"
 
-# For development (from the root of the project repository)
-pip install -e .[dev]
 ```
 
 ### 2. Configuration
