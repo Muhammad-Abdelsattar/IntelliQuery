@@ -5,7 +5,7 @@ import logging
 from typing import Optional, Dict, List, Any
 import importlib.resources
 
-from simple_llm import LLMInterface, FileSystemPromptProvider
+from nexus_llm import LLMInterface, FileSystemPromptProvider
 
 from .database import DatabaseService
 from ..models.agent_io import InspectionPlan

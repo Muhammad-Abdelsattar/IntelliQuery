@@ -5,7 +5,7 @@ from typing import Dict, Any
 import importlib.resources
 
 from langgraph.graph import StateGraph
-from simple_llm import LLMInterface, FileSystemPromptProvider
+from nexus_llm import LLMInterface, FileSystemPromptProvider
 
 from ..core.database import DatabaseService
 from ..models.state import SQLAgentState

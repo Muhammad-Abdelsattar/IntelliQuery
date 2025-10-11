@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 from typing import List, Tuple, Optional, Union, Literal
 
-from simple_llm import LLMInterface
+from nexus_llm import LLMInterface
 
 from .core.database import DatabaseService
 from .models.public import SQLPlan, SQLResult, EnrichedDatabaseContext
@@ -11,6 +11,7 @@ from .workflows.simple import SimpleWorkflow
 from .workflows.reflection import ReflectionWorkflow
 
 logger = logging.getLogger(__name__)
+
 
 class SQLAgent:
     """
@@ -38,7 +39,7 @@ class SQLAgent:
             workflow = ReflectionWorkflow(llm_interface, db_service)
         else:
             raise ValueError(f"Unknown workflow type: {workflow_type}")
-            
+
         self.app = workflow.compile()
 
     def run(
@@ -105,7 +106,7 @@ class SQLAgent:
                     error_message=str(e),
                     is_validated=False,
                 )
-        
+
         # Handle execution path
         if gen_result.status == "clarification":
             return SQLResult(

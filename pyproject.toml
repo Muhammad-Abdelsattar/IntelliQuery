@@ -5,33 +5,105 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "intelliquery"
 version = "0.1.0"
-description = "A self-contained, installable agent for converting natural language to SQL queries and data insights."
+authors = [
+  { name="Muhammad Abd Al-sattar", email="muhammadabdalsattar@gmail.com" },
+]
+description = "An agentic AI toolkit for democratizing database access through natural language."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Database",
 ]
+
+# Core Dependencies 
 dependencies = [
-    # "simple-llm-interface>=0.1.0",
-    # "pandas>=2.0.0",
-    # "SQLAlchemy>=2.0.0",
-    # "sqlparse>=0.4.0",
-    # "langgraph>=0.0.30",
-    # # Required by langchain_community used in database service
-    # "langchain-community>=0.0.32"
+    "pandas>=2.0",
+    "sqlalchemy>=2.0",
+    "psycopg2-binary",
+    "pydantic>=2.0",
+    "langgraph",
+    "simple-llm",
+    "langchain-google-genai",
+    "typing-extensions",
+    "sqlparse",
+    "python-dotenv",
 ]
 
-[project.urls]
-Homepage = "https://github.com/muhammad-abdelsattar/IntelliQuery"
 
+# Optional Dependencies
+# To install:
+#   pip install .[test]
+#   pip install .[dev]
+[project.optional-dependencies]
+# Dependencies needed specifically for running the test suite
+test = [
+    "pytest>=7.0",
+    "pytest-mock",
+    "pytest-cov", 
+]
+
+# A comprehensive group for development, including testing tools and linters
+dev = [
+    "intelliquery[test]",
+    "ruff",             
+    "ipykernel",       
+]
+
+# Setuptools Configuration
 [tool.setuptools]
 package-dir = {"" = "src"}
+# Automatically find all packages within the 'src' directory.
+packages = { find = { where = ["src"] } }
 
-[tool.setuptools.packages.find]
-where = ["src"]
 
-[tool.setuptools.package-data]
-sql_agent_toolkit = ["prompts/*"]
+# Pytest Configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+# Specifies the directory to search for tests.
+testpaths = [
+    "tests",
+]
+dotenv_files = [
+    ".env.test",
+    ".env",
+]
+addopts = "-ra --strict-markers --import-mode=importlib"
+
+
+[tool.coverage.run]
+# Measure coverage for the code inside your 'src/intelliquery' directory.
+source = ["src.intelliquery"]
+# Exclude files that are not useful to measure coverage on.
+omit = [
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+# Show which lines were not executed in the coverage report.
+show_missing = true
+# Enforce a quality gate: the test suite will fail if coverage drops below 85%.
+fail_under = 85
+
+
+[tool.ruff]
+line-length = 88
+# Use the same Python version as the project for accurate linting.
+target-version = "py39"
+
+[tool.ruff.lint]
+# A good starting set of rules:
+# E, W: pycodestyle errors and warnings
+# F: Pyflakes (errors)
+# I: isort (import sorting)
+# UP: pyupgrade (modernize code syntax)
+select = ["E", "W", "F", "I", "UP"]
+
+# To use the formatter: ruff format .
+# To run the linter and auto-fix: ruff check --fix .
