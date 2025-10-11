@@ -16,7 +16,7 @@ class ReflectionWorkflow(BaseWorkflow):
     examines the generated SQL for improvements before execution.
     """
 
-    def _build_graph(self) -> StateGraph:
+    def build_graph(self) -> StateGraph:
         """Builds the LangGraph workflow with a reflection loop."""
         graph = StateGraph(SQLAgentState)
         graph.add_node("generate_sql", self.generate_sql_node)
@@ -40,18 +40,22 @@ class ReflectionWorkflow(BaseWorkflow):
         )
         return graph
 
-    def reflection_node(self, state: SQLAgentState) -> Dict[str, Any]:
-        """Node that reviews the generated SQL for correctness and performance."""
-        logger.info("\t\t > Reviewing generated SQL...")
-
-        prompt = self.prompt_provider.get_template(
-            os.path.join("reflection_workflow", "reflection.prompt")
-        )
-        variables = {
+    def _prepare_reflection_prompt_variables(
+        self, state: SQLAgentState
+    ) -> Dict[str, Any]:
+        """Prepares the variables for the reflection/review prompt."""
+        return {
             "user_question": state["natural_language_question"],
             "schema_definition": state["db_context"]["augmented_schema"],
             "sql_query": state["generation_result"].query,
         }
+
+    def reflection_node(self, state: SQLAgentState) -> Dict[str, Any]:
+        """Node that reviews the generated SQL for correctness and performance."""
+        logger.info("--- Reviewing generated SQL ---")
+
+        prompt = self.prompt_provider.get_template(os.path.join("reflection_workflow","reflection.prompt"))
+        variables = self._prepare_reflection_prompt_variables(state)
 
         review = self.llm_interface.generate_structured(
             system_prompt=prompt,
@@ -60,11 +64,12 @@ class ReflectionWorkflow(BaseWorkflow):
             response_model=ReflectionReview,
         )
 
+        logger.info(f"--- Reviewer decision: {review.decision} ---")
         if review.suggestions:
             logger.info(f"--- Reviewer suggestions: {review.suggestions} ---")
 
         return {
-            "review": review.suggestions,
+            "review": review.suggestions if review.decision == "revise" else None,
             "current_reflection_attempt": state["current_reflection_attempt"] + 1,
         }
 
@@ -72,7 +77,7 @@ class ReflectionWorkflow(BaseWorkflow):
         """Determines if the reflection step should be triggered."""
         if state["generation_result"].status == "success":
             return "reflect"
-        # For clarification or error, skip reflection and go to execute/end
+        # For clarification or error, skip reflection and go to the end
         return "execute"
 
     def decide_after_reflection_node(self, state: SQLAgentState) -> str:
@@ -83,7 +88,7 @@ class ReflectionWorkflow(BaseWorkflow):
 
         if state["current_reflection_attempt"] >= state["max_reflection_attempts"]:
             logger.warning(
-                "--- Max reflection attempts reached. Proceeding to execution. ---"
+                "--- Max reflection attempts reached. Proceeding to execution with last query. ---"
             )
             return "execute"
 

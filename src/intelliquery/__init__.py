@@ -1,4 +1,4 @@
-from .agent import SQLAgent
+from .orchestrator import QueryOrchestrator
 from .core.database_analyzer import DBContextAnalyzer
 from .core.database import DatabaseService
 from .core.exceptions import (
@@ -6,13 +6,16 @@ from .core.exceptions import (
     SQLGenerationError,
     DatabaseConnectionError,
 )
-from .core.caching import FileSystemCacheProvider
+from .core.caching import FileSystemCacheProvider, CacheProvider, InMemoryCacheProvider
 from .models.public import SQLPlan, SQLResult, EnrichedDatabaseContext
 
 __all__ = [
-    "SQLAgent",
+    "QueryOrchestrator",
     "DBContextAnalyzer",
     "DatabaseService",
+    "FileSystemCacheProvider",
+    "CacheProvider",
+    "InMemoryCacheProvider",
     "SQLToolkitError",
     "SQLGenerationError",
     "DatabaseConnectionError",

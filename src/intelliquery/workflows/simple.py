@@ -10,7 +10,7 @@ class SimpleWorkflow(BaseWorkflow):
     It follows a simple generate -> execute -> retry loop.
     """
 
-    def _build_graph(self) -> StateGraph:
+    def build_graph(self) -> StateGraph:
         """Builds the internal LangGraph workflow for the agent."""
         graph = StateGraph(SQLAgentState)
         graph.add_node("generate_sql", self.generate_sql_node)

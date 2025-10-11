@@ -1,9 +1,9 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from src.intelliquery.core.database_analyzer import DBContextAnalyzer
-from src.intelliquery.models.public import EnrichedDatabaseContext
-from src.intelliquery.models.agent_io import InspectionPlan, ColumnToInspect
+from intelliquery.core.database_analyzer import DBContextAnalyzer
+from intelliquery.models.public import EnrichedDatabaseContext
+from intelliquery.models.agent_io import InspectionPlan, ColumnToInspect
 
 
 def test_synthesize_schema_standard_augmentation():
@@ -92,7 +92,7 @@ def test_build_context_cache_miss(mocker):
 
     # Mock the synthesizer so we don't re-test it
     mocker.patch(
-        "src.intelliquery.core.database_analyzer.DBContextAnalyzer._synthesize_augmented_schema",
+        "intelliquery.core.database_analyzer.DBContextAnalyzer._synthesize_augmented_schema",
         return_value="final_augmented_schema",
     )
 

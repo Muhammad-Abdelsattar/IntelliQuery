@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from src.intelliquery.core.caching import InMemoryCacheProvider, FileSystemCacheProvider
+from intelliquery.core.caching import InMemoryCacheProvider, FileSystemCacheProvider
 
 
 def test_in_memory_cache_set_and_get():

@@ -1,7 +1,7 @@
 import os
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, List
 import importlib.resources
 
 from langgraph.graph import StateGraph
@@ -9,7 +9,7 @@ from nexus_llm import LLMInterface, FileSystemPromptProvider
 
 from ..core.database import DatabaseService
 from ..models.state import SQLAgentState
-from ..models.agent_io import LLM_SQLResponse
+from ..models.agent_io import LLM_SQLResponse, ReflectionReview
 
 logger = logging.getLogger(__name__)
 
@@ -32,65 +32,42 @@ class BaseWorkflow(ABC):
         self.prompt_provider = FileSystemPromptProvider(base_path=prompts_base_path)
 
     @abstractmethod
-    def _build_graph(self) -> StateGraph:
+    def build_graph(self) -> StateGraph:
         """Subclasses must implement this method to define the workflow graph."""
         pass
 
     def compile(self):
         """Builds and compiles the graph, returning the runnable app."""
-        graph = self._build_graph()
+        graph = self.build_graph()
         return graph.compile()
 
     def generate_sql_node(self, state: SQLAgentState) -> Dict[str, Any]:
         """Node that generates an SQL query using the pre-built context."""
+        attempt_number = state["current_attempt"] + 1
         logger.info(
-            f"\t\t > Attempt {state['current_attempt'] + 1}/{state['max_attempts']}: Generating SQL..."
-        )
-        chat_history_str = "\n".join(
-            [f"Human: {q}\nAI: {a}" for q, a in state["chat_history"]]
-        ).strip()
-        system_prompt = self.prompt_provider.get_template(
-            os.path.join("direct_workflow", "direct_generation.prompt")
+            f"--- Attempt {attempt_number}/{state['max_attempts']}: Generating SQL ---"
         )
 
-        # Append reflection review if it exists
-        history = state["history"]
-        if state.get("review"):
-            history = history + [f"REVIEWER SUGGESTIONS:\n{state['review']}"]
+        # Prepare inputs for the LLM call (delegated to a helper)
+        prompt_variables = self._prepare_generation_prompt_variables(state)
+        system_prompt = self.prompt_provider.get_template(os.path.join("direct_workflow","direct_generation.prompt"))
 
-        llm_variables = {
-            "database_dialect": self.db_service.dialect,
-            "schema_definition": state["db_context"]["augmented_schema"],
-            "business_context": state["db_context"]["business_context"],
-            "user_question": state["natural_language_question"],
-            "history": "\n".join(history),
-            "chat_history": (
-                chat_history_str
-                if chat_history_str
-                else "No previous conversation history."
-            ),
-        }
-
+        # Call the LLM
         response = self.llm_interface.generate_structured(
             system_prompt=system_prompt,
             user_input=state["natural_language_question"],
-            variables=llm_variables,
+            variables=prompt_variables,
             response_model=LLM_SQLResponse,
         )
 
-        history_entry = (
-            f"ATTEMPT {state['current_attempt'] + 1} - Status: {response.status}"
-        )
-        if response.query:
-            history_entry += f"\nSQL:\n{response.query}"
-        if response.reason:
-            history_entry += f"\nReason:\n{response.reason}"
+        # Format and update state (delegated to a helper)
+        history_entry = self._create_history_entry(attempt_number, response)
 
         return {
             "generation_result": response,
-            "current_attempt": state["current_attempt"] + 1,
+            "current_attempt": attempt_number,
             "history": state["history"] + [history_entry],
-            "review": None,  # Clear previous review
+            "review": None,  # Clear previous review after using it
         }
 
     def execute_sql_node(self, state: SQLAgentState) -> Dict[str, Any]:
@@ -103,7 +80,7 @@ class BaseWorkflow(ABC):
             return {}
 
         sql_query = gen_result.query.strip()
-        logger.info(f"\t\t > Executing SQL: {sql_query}")
+        logger.info(f"--- Executing SQL: {sql_query} ---")
         try:
             results_df = self.db_service.execute_for_dataframe(sql_query)
             logger.info("Successfully executed SQL.")
@@ -134,3 +111,43 @@ class BaseWorkflow(ABC):
             return "end"
         logger.info("--- Database error detected, retrying generation ---")
         return "retry"
+
+    # --------------------------------------------------------------------------------
+    # Private Helpers
+
+    def _prepare_generation_prompt_variables(
+        self, state: SQLAgentState
+    ) -> Dict[str, Any]:
+        """Abstracts the logic for preparing the variables for the generation prompt."""
+        chat_history_str = "\n".join(
+            [f"Human: {q}\nAI: {a}" for q, a in state["chat_history"]]
+        ).strip()
+
+        # Combine internal history with any recent reviewer feedback for a complete context
+        full_internal_history = state["history"]
+        if state.get("review"):
+            full_internal_history = full_internal_history + [
+                f"REVIEWER SUGGESTIONS:\n{state['review']}"
+            ]
+
+        return {
+            "database_dialect": self.db_service.dialect,
+            "schema_definition": state["db_context"]["augmented_schema"],
+            "business_context": state["db_context"]["business_context"],
+            "user_question": state["natural_language_question"],
+            "history": "\n".join(full_internal_history),
+            "chat_history": (
+                chat_history_str
+                if chat_history_str
+                else "No previous conversation history."
+            ),
+        }
+
+    def _create_history_entry(self, attempt: int, response: LLM_SQLResponse) -> str:
+        """Creates a formatted string for the internal history scratchpad."""
+        entry = f"ATTEMPT {attempt} - Status: {response.status}"
+        if response.query:
+            entry += f"\nSQL:\n{response.query}"
+        if response.reason:
+            entry += f"\nReason:\n{response.reason}"
+        return entry

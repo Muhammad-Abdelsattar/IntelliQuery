@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
-from src.intelliquery.workflows.reflection import ReflectionWorkflow
-from src.intelliquery.models.agent_io import LLM_SQLResponse, ReflectionReview
+from intelliquery.workflows.reflection import ReflectionWorkflow
+from intelliquery.models.agent_io import LLM_SQLResponse, ReflectionReview
 
 # A sample state dictionary to be used across multiple tests
 SAMPLE_STATE = {
