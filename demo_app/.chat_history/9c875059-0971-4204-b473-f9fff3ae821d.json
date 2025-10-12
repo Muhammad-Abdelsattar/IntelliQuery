@@ -1,0 +1,14 @@
+{
+  "connection_name": "sales_database",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hello there !\\"
+    },
+    {
+      "role": "assistant",
+      "content_type": "text",
+      "content": "Hello! How can I help you today? What kind of SQL query are you looking for?"
+    }
+  ]
+}
