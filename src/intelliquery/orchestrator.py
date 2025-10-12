@@ -98,6 +98,7 @@ class QueryOrchestrator:
                 status="error",
                 error_message=f"SQL execution failed after {final_state['current_attempt']} attempts: {db_error}",
                 sql_query=gen_result.query,
+                reasoning=gen_result.reason,
             )
 
         # Handle successful plan-only mode
@@ -124,6 +125,7 @@ class QueryOrchestrator:
             status="success",
             dataframe=final_state.get("final_dataframe"),
             sql_query=final_state.get("generated_sql"),
+            reasoning=gen_result.reason,
         )
 
     def run(
