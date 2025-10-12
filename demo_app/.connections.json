@@ -1,9 +1,0 @@
-[
-  {
-    "name": "sales_database",
-    "dialect": "postgresql",
-    "url": "postgresql://admin:secretpassword@localhost:5432/sales_database",
-    "tables": "",
-    "business_context": ""
-  }
-]
