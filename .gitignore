@@ -10,9 +10,9 @@ __pycache__/
 *.onnx
 
 # Demo App
-.connections.json
-.chat_history/
-.streamlit/
+*/.connections.json
+*/.chat_history/
+*/.streamlit/
 
 
 # C extensions
