@@ -9,6 +9,12 @@ __pycache__/
 *.pickle
 *.onnx
 
+# Demo App
+.connections.json
+.chat_history/
+.streamlit/
+
+
 # C extensions
 *.so
 *.zip
