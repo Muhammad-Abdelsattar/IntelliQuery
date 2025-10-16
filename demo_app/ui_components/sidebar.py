@@ -1,29 +1,60 @@
 import streamlit as st
-from state import AppState
-from services import connection_service, chat_service
+from state import AppState, get_state
+from services import chat_service
 
 
 def build_sidebar():
     """
-    Builds the main sidebar for the application, making it consistent across all pages.
-    This sidebar is now the central hub for connection and chat management.
+    Builds the main sidebar, now driving the state of the single-page app.
     """
+    state = get_state()
+
     with st.sidebar:
         st.header("IntelliQuery")
         st.markdown("Your AI Database Assistant")
 
+        # Page Navigation
+        # Use buttons to set the page state, which the main app will use to render
+        if st.button("🏠 Home", use_container_width=True):
+            state.set_page("home")
+            st.rerun()
+        if st.button("🗄️ Manage Connections", use_container_width=True):
+            state.set_page("connection_manager")
+            st.rerun()
+
+        st.divider()
+
         # Connection Selection
         st.subheader("Database Connection")
-        connections = st.session_state.get(AppState.CONNECTIONS, [])
+        connections = state.connections
         connection_options = {conn["name"]: conn for conn in connections}
 
-        current_conn_name = None
-        if st.session_state.get(AppState.SELECTED_CONNECTION):
-            current_conn_name = st.session_state[AppState.SELECTED_CONNECTION]["name"]
+        # Initialize confirmation state
+        if "pending_connection_change" not in st.session_state:
+            st.session_state.pending_connection_change = None
 
+        # Handle pending connection change confirmation
+        if st.session_state.pending_connection_change:
+            st.warning(
+                "Changing connections will start a new chat session. Your current chat will be lost. Proceed?"
+            )
+            c1, c2 = st.columns(2)
+            if c1.button("✅ Proceed", use_container_width=True):
+                new_conn_name = st.session_state.pending_connection_change
+                st.session_state.pending_connection_change = None
+                if state.select_connection(new_conn_name):
+                    state.set_page("chat")
+                    st.rerun()
+            if c2.button("❌ Cancel", use_container_width=True):
+                st.session_state.pending_connection_change = None
+                st.rerun()
+
+        current_conn_name = (
+            state.selected_connection["name"] if state.selected_connection else None
+        )
         selected_name = st.selectbox(
             "Active Connection",
-            options=connection_options.keys(),
+            options=list(connection_options.keys()),
             index=(
                 list(connection_options.keys()).index(current_conn_name)
                 if current_conn_name in connection_options
@@ -33,29 +64,26 @@ def build_sidebar():
             label_visibility="collapsed",
         )
 
-        # If the user selects a different connection, update the state and rerun
         if selected_name and selected_name != current_conn_name:
-            st.session_state[AppState.SELECTED_CONNECTION] = connection_options[
-                selected_name
-            ]
-            # When connection changes, we need to reset dependent services
-            st.session_state[AppState.SERVICES_INITIALIZED] = False
-            st.rerun()
-
-        if st.button("Manage Connections", use_container_width=True):
-            st.switch_page("pages/connection_manager.py")
+            # If chat is active, ask for confirmation. Otherwise, switch directly.
+            if state.chat_history:
+                st.session_state.pending_connection_change = selected_name
+                st.rerun()
+            else:
+                if state.select_connection(selected_name):
+                    state.set_page("chat")
+                    st.rerun()
 
         st.divider()
 
+        # Chat History Management
         st.subheader("Chat History")
         if st.button("➕ New Chat", use_container_width=True):
-            if not st.session_state.get(AppState.SELECTED_CONNECTION):
+            if not state.selected_connection:
                 st.warning("Please select a connection first.")
             else:
-                st.session_state[AppState.CURRENT_CHAT_ID] = (
-                    chat_service.get_new_chat_id()
-                )
-                st.session_state[AppState.CHAT_HISTORY] = []
+                state.start_new_chat()
+                state.set_page("chat")
                 st.rerun()
 
         with st.expander("Load Past Chat"):
@@ -67,55 +95,72 @@ def build_sidebar():
                     session["name"], key=session["id"], use_container_width=True
                 ):
                     conn_name, history = chat_service.load_chat_history(session["id"])
-
-                    # Find the full connection object from the name
-                    connections = st.session_state.get(AppState.CONNECTIONS, [])
-                    conn_to_load = next(
-                        (c for c in connections if c["name"] == conn_name), None
-                    )
-
-                    if conn_to_load:
-                        st.session_state[AppState.SELECTED_CONNECTION] = conn_to_load
-                        st.session_state[AppState.CURRENT_CHAT_ID] = session["id"]
-                        st.session_state[AppState.CHAT_HISTORY] = history
-                        # We need to re-initialize services with the new connection
-                        st.session_state[AppState.SERVICES_INITIALIZED] = False
+                    if state.select_connection(conn_name):
+                        state.chat_history = history
+                        state.current_chat_id = session["id"]
+                        state.set_page("chat")
                         st.rerun()
                     else:
                         st.error(
                             f"Connection '{conn_name}' for this chat could not be found."
                         )
 
-        # We can detect the current page to decide whether to show these
-        if st.session_state.get("active_page") == "chat":
+        # Session controls are now part of the main sidebar, shown only on the chat page
+        if state.page == "chat":
             st.divider()
             st.subheader("Session Controls")
 
-            agent_mode = st.radio(
-                "Agent Mode", ["execute", "plan"], index=0, horizontal=True
-            )
-            workflow_mode = st.radio(
-                "Workflow", ["simple", "reflection"], index=0, horizontal=True
-            )
+            st.markdown("**AI Model**")
+            if state.all_llm_providers:
+                provider_keys = list(state.all_llm_providers.llm_providers.keys())
+                current_provider = state.selected_llm_provider or (provider_keys[0] if provider_keys else None)
 
-            with st.expander("**Current Chat's Business Context**", expanded=False):
-                st.info("Define business rules for this session only.", icon="ℹ️")
-                if AppState.BUSINESS_CONTEXT not in st.session_state:
-                    default_context = ""
-                    if st.session_state.get(AppState.SELECTED_CONNECTION):
-                        default_context = st.session_state[
-                            AppState.SELECTED_CONNECTION
-                        ].get("business_context", "")
-                    st.session_state[AppState.BUSINESS_CONTEXT] = default_context
-
-                st.session_state[AppState.BUSINESS_CONTEXT] = st.text_area(
-                    "Context",
-                    value=st.session_state[AppState.BUSINESS_CONTEXT],
-                    height=200,
+                selected_provider_key = st.selectbox(
+                    "Select the AI model for this session:",
+                    options=provider_keys,
+                    index=(
+                        provider_keys.index(current_provider)
+                        if current_provider in provider_keys
+                        else 0
+                    ),
                     label_visibility="collapsed",
                 )
 
-            return agent_mode == "execute", workflow_mode
+                if selected_provider_key != state.selected_llm_provider:
+                    state.selected_llm_provider = selected_provider_key
+                    state.services_initialized = False
+                    st.rerun()
 
-    # Return default values if not on the chat page
-    return True, "simple"
+            state.workflow_mode = st.radio(
+                "Workflow", ["simple", "reflection"], index=0, horizontal=True
+            )
+
+            # Map internal agent mode values to user-friendly labels
+            agent_mode_options = {"Automatic": "execute", "Manual Approval": "plan"}
+            # Get current index based on state
+            current_agent_mode_label = [k for k, v in agent_mode_options.items() if v == state.agent_mode][0]
+            available_labels = list(agent_mode_options.keys())
+
+            selected_label = st.radio(
+                "Execution Mode",
+                options=available_labels,
+                index=available_labels.index(current_agent_mode_label),
+                horizontal=True,
+                help="**Automatic**: The AI will run queries instantly. **Manual Approval**: The AI will generate a query and wait for you to run it.",
+            )
+            # Update state with the internal value
+            state.agent_mode = agent_mode_options[selected_label]
+
+            with st.expander("**Current Chat's Business Context**", expanded=False):
+                st.info("Define business rules for this session only.", icon="ℹ️")
+                default_context = (
+                    state.selected_connection.get("business_context", "")
+                    if state.selected_connection
+                    else ""
+                )
+                state.business_context = st.text_area(
+                    "Context",
+                    value=state.business_context or default_context,
+                    height=200,
+                    label_visibility="collapsed",
+                )

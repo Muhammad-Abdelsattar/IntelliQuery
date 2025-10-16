@@ -60,7 +60,6 @@ class DatabaseService(SQLDatabase):
         """
         Gets the raw schema DDL and computes a stable SHA256 hash to use as a cache key.
         """
-        # We now use the `get_table_info` method from the parent class
         raw_schema = self.get_table_info()
         schema_key = hashlib.sha256(raw_schema.encode()).hexdigest()
         return raw_schema, schema_key

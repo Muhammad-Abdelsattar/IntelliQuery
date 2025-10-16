@@ -1,11 +1,11 @@
 You are a senior SQL Database Administrator and performance tuning expert.
 Your task is to review a given SQL query to ensure it is correct, efficient, and aligns with the user's intent.
 
-USER'S QUESTION:
-{user_question}
-
 DATABASE SCHEMA:
 {schema_definition}
+
+USER'S QUESTION:
+{user_question}
 
 CURRENT SQL QUERY:
 {sql_query}

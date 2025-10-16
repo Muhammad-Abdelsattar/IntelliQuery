@@ -20,8 +20,7 @@ def save_chat_history(chat_id: str, connection_name: str, history: List[Dict[str
     for message in serializable_history:
         if message.get("content_type") == "result":
             data = message.get("data", {})
-            if "dataframe" in data and isinstance(data["dataframe"], pd.DataFrame):
-                data["dataframe_json"] = data["dataframe"].to_json(orient='split')
+            if "dataframe" in data:
                 del data["dataframe"]
 
     # Create a new structure that includes the connection name
@@ -48,17 +47,6 @@ def load_chat_history(chat_id: str) -> Tuple[str, List[Dict[str, Any]]]:
     connection_name = payload.get("connection_name")
     history = payload.get("messages", [])
     
-    # Convert JSON strings back to DataFrame objects
-    for message in history:
-        if message.get("content_type") == "result":
-            data = message.get("data", {})
-            if "dataframe_json" in data:
-                try:
-                    data["dataframe"] = pd.read_json(data["dataframe_json"], orient='split')
-                    del data["dataframe_json"]
-                except Exception:
-                    data["dataframe"] = pd.DataFrame()
-                    
     return connection_name, history
 
 def get_new_chat_id() -> str:
@@ -81,3 +69,29 @@ def list_chat_sessions() -> List[Dict[str, str]]:
             except (IndexError, KeyError):
                 continue
     return sessions
+
+
+def get_conversation_history(
+    chat_history: list[dict[str, any]]
+) -> list[tuple[str, str]]:
+    """
+    Extracts a clean (user, assistant) conversational history for the LLM.
+    """
+    conversation_history = []
+    for i in range(len(chat_history) - 1):
+        current_msg = chat_history[i]
+        next_msg = chat_history[i + 1]
+
+        if current_msg.get("role") == "user" and next_msg.get("role") == "assistant":
+            user_question = current_msg.get("content", "")
+            ai_answer = ""
+            content_type = next_msg.get("content_type", "text")
+
+            if content_type in ["text", "error"]:
+                ai_answer = next_msg.get("content", "")
+            elif content_type == "result":
+                ai_answer = next_msg.get("data", {}).get("sql_query", "")
+
+            if user_question and ai_answer:
+                conversation_history.append((user_question, ai_answer))
+    return conversation_history
