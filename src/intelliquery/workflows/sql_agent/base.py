@@ -7,9 +7,9 @@ import importlib.resources
 from langgraph.graph import StateGraph
 from nexus_llm import LLMInterface, FileSystemPromptProvider
 
-from ..core.database import DatabaseService
-from ..models.sql_agent.state import SQLAgentState
-from ..models.sql_agent.agent_io import LLM_SQLResponse, ReflectionReview
+from ...core.database import DatabaseService
+from ...models.sql_agent.state import SQLAgentState
+from ...models.sql_agent.agent_io import LLM_SQLResponse, ReflectionReview
 
 logger = logging.getLogger(__name__)
 
