@@ -4,8 +4,8 @@ from typing import Dict, Any
 from langgraph.graph import StateGraph, END
 
 from .base import BaseWorkflow
-from ..models.state import SQLAgentState
-from ..models.agent_io import ReflectionReview
+from ..models.sql_agent.state import SQLAgentState
+from ..models.sql_agent.agent_io import ReflectionReview
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,9 @@ class ReflectionWorkflow(BaseWorkflow):
         """Node that reviews the generated SQL for correctness and performance."""
         logger.info("--- Reviewing generated SQL ---")
 
-        prompt = self.prompt_provider.get_template(os.path.join("reflection_workflow","reflection.prompt"))
+        prompt = self.prompt_provider.get_template(
+            os.path.join("sql_agent", "reflection.prompt")
+        )
         variables = self._prepare_reflection_prompt_variables(state)
 
         review = self.llm_interface.generate_structured(

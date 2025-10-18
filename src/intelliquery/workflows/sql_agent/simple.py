@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
 
-from ..models.state import SQLAgentState
+from ..models.sql_agent.state import SQLAgentState
 from .base import BaseWorkflow
 
 

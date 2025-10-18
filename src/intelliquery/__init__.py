@@ -1,4 +1,4 @@
-from .orchestrator import QueryOrchestrator
+from .agents.sql_agent import QueryOrchestrator
 from .core.database_analyzer import DBContextAnalyzer
 from .core.database import DatabaseService
 from .core.exceptions import (
@@ -7,7 +7,7 @@ from .core.exceptions import (
     DatabaseConnectionError,
 )
 from .core.caching import FileSystemCacheProvider, CacheProvider, InMemoryCacheProvider
-from .models.public import SQLPlan, SQLResult, EnrichedDatabaseContext
+from .models.sql_agent.public import SQLPlan, SQLResult, EnrichedDatabaseContext
 
 __all__ = [
     "QueryOrchestrator",

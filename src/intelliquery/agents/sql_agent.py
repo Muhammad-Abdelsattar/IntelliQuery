@@ -4,11 +4,11 @@ from typing import List, Tuple, Optional, Union, Literal
 
 from nexus_llm import LLMInterface
 
-from .core.database import DatabaseService
-from .models.sql_agent.public import SQLPlan, SQLResult, EnrichedDatabaseContext
-from .models.sql_agent.state import SQLAgentState
-from .workflows.sql_agent.simple import SimpleWorkflow
-from .workflows.sql_agent.reflection import ReflectionWorkflow
+from ..core.database import DatabaseService
+from ..models.sql_agent.public import SQLPlan, SQLResult, EnrichedDatabaseContext
+from ..models.sql_agent.state import SQLAgentState
+from ..workflows.sql_agent.simple import SimpleWorkflow
+from ..workflows.sql_agent.reflection import ReflectionWorkflow
 
 logger = logging.getLogger(__name__)
 

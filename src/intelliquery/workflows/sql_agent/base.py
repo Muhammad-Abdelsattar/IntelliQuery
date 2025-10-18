@@ -8,8 +8,8 @@ from langgraph.graph import StateGraph
 from nexus_llm import LLMInterface, FileSystemPromptProvider
 
 from ..core.database import DatabaseService
-from ..models.state import SQLAgentState
-from ..models.agent_io import LLM_SQLResponse, ReflectionReview
+from ..models.sql_agent.state import SQLAgentState
+from ..models.sql_agent.agent_io import LLM_SQLResponse, ReflectionReview
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,9 @@ class BaseWorkflow(ABC):
 
         # Prepare inputs for the LLM call (delegated to a helper)
         prompt_variables = self._prepare_generation_prompt_variables(state)
-        system_prompt = self.prompt_provider.get_template(os.path.join("direct_workflow","direct_generation.prompt"))
+        system_prompt = self.prompt_provider.get_template(
+            os.path.join("sql_agent", "direct_generation.prompt")
+        )
 
         # Call the LLM
         response = self.llm_interface.generate_structured(

@@ -8,8 +8,8 @@ import importlib.resources
 from nexus_llm import LLMInterface, FileSystemPromptProvider
 
 from .database import DatabaseService
-from ..models.agent_io import InspectionPlan
-from ..models.public import EnrichedDatabaseContext
+from ..models.sql_agent.agent_io import InspectionPlan
+from ..models.sql_agent.public import EnrichedDatabaseContext
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +159,7 @@ class DBContextAnalyzer:
 
         # Cache Miss: Analyze the schema with an LLM
         analyzer_prompt = self.prompt_provider.get_template(
-            os.path.join("context_analyzer", "schema_analyzer.prompt")
+            os.path.join("sql_agent", "schema_analyzer.prompt")
         )
         try:
             plan = self.llm_interface.generate_structured(
