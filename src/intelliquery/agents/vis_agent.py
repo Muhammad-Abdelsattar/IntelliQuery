@@ -1,10 +1,8 @@
 from __future__ import annotations
 import logging
-import yaml
-from typing import Dict, Any
 import importlib.resources
-
 from pathlib import Path
+from typing import Optional
 
 from nexus_llm import LLMInterface
 
@@ -12,6 +10,7 @@ from ..models.sql_agent.public import SQLResult
 from ..models.vis_agent.public import VisualizationResult
 from ..models.vis_agent.state import VisAgentState
 from ..core.data_analyzer import generate_dataframe_metadata
+from ..core.vis_provider import VisualizationProvider, PlotlyProvider
 from ..workflows.vis_agent.react import ReactWorkflow
 
 logger = logging.getLogger(__name__)
@@ -21,20 +20,25 @@ class VisualizationAgent:
     """
     A high-level orchestrator for the visualization agent.
     It initializes and runs the ReAct workflow to generate a visualization
-    from a given SQL result.
+    from a given SQL result using a configurable visualization provider.
     """
 
     def __init__(
         self,
         llm_interface: LLMInterface,
+        provider: Optional[VisualizationProvider] = None,
     ):
         self.llm_interface = llm_interface
+        self.provider = provider or PlotlyProvider()
+
         prompts_base_path = importlib.resources.files("intelliquery") / "prompts"
         vis_framework_path = (
             Path(prompts_base_path) / "vis_agent" / "react_agent.prompt"
         )
         self.vis_framework = vis_framework_path.read_text()
-        self.app = ReactWorkflow(llm_interface).compile()
+
+        # Inject the provider into the workflow
+        self.app = ReactWorkflow(llm_interface, self.provider).compile()
 
     def _prepare_initial_state(
         self,

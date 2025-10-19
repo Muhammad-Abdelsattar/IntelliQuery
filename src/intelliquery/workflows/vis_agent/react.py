@@ -1,19 +1,15 @@
 from __future__ import annotations
 import os
-from pathlib import Path
 import logging
-import json
 from typing import Dict, Any, List
 import importlib.resources
 
 from langgraph.graph import StateGraph, END
 from nexus_llm import LLMInterface, FileSystemPromptProvider
-import plotly.express as px
-import plotly.graph_objects as go
-
 
 from ...models.vis_agent.state import VisAgentState
 from ...models.vis_agent.agent_io import VisualizationToolset
+from ...core.vis_provider import VisualizationProvider
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +22,13 @@ class ReactWorkflow:
     def __init__(
         self,
         llm_interface: LLMInterface,
+        provider: VisualizationProvider,
     ):
         self.llm_interface = llm_interface
+        self.provider = provider  # Store the injected provider
         prompts_base_path = importlib.resources.files("intelliquery") / "prompts"
         self.prompt_provider = FileSystemPromptProvider(base_path=prompts_base_path)
-
-        with open(prompts_base_path / "vis_agent" / "vis_functions_mapping.json") as f:
-            self.vis_functions_mapping = json.load(f)
+        # The mapping file is no longer loaded here
 
     def build_graph(self) -> StateGraph:
         """Builds the LangGraph workflow for the ReAct loop."""
@@ -106,44 +102,39 @@ class ReactWorkflow:
 
     def tool_execution_node(self, state: VisAgentState) -> Dict[str, Any]:
         """
-        The "act" step. It executes the visualization tool chosen by the LLM.
+        The "act" step. It delegates the visualization creation to the
+        configured provider.
         """
         reasoning, toolset, _ = state["agent_scratchpad"][-1]
 
         tool_name, args = next(iter(toolset.items()))
 
-        logger.info(f"--- Executing Visualization Tool: {tool_name} ---")
+        logger.info(f"--- Delegating to Provider for Tool: {tool_name} ---")
 
         observation = ""
         final_visualization = None
         error = None
 
-        tool_function = self.vis_functions_mapping[tool_name].split(".")[-1]
-
         try:
-            if not hasattr(px, tool_function):
-                raise NotImplementedError(
-                    f"Chart type '{tool_name}' requires go.Figure and is not yet supported in this dynamic workflow."
-                )
+            # Delegate chart creation to the provider. This is the key change.
+            final_visualization = self.provider.create_chart(
+                chart_type=tool_name,
+                dataframe=state["dataframe"],
+                **args["arguments"],
+            )
 
-            vis_func = getattr(px, tool_function)
-
-            # Create a temporary copy of the arguments for execution, injecting the dataframe
-            # This ensures the original toolset in the scratchpad remains serializable.
-            execution_args = args["arguments"].copy()
-            execution_args["data_frame"] = state["dataframe"]
-
-            fig = vis_func(**execution_args)
-            fig.update_layout(template="plotly_white")  # Apply a clean template
-
-            observation = f"Successfully generated '{tool_name}'."
-            final_visualization = fig
+            observation = f"Successfully generated '{tool_name}' via provider."
             logger.info(f"--- {observation} ---")
 
-        except (ValueError, AttributeError, TypeError, KeyError, Exception) as e:
-            error = f"Error executing {tool_name}: {e}"
+        except (NotImplementedError, ValueError, AttributeError, TypeError, KeyError) as e:
+            error = f"Error during visualization generation: {e}"
             observation = error
             logger.error(f"--- {error} ---")
+        except Exception as e:
+            error = f"An unexpected error occurred: {e}"
+            observation = error
+            logger.error(f"--- {error} ---")
+
 
         return {
             "final_visualization": final_visualization,
