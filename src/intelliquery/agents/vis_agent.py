@@ -17,7 +17,7 @@ from ..workflows.vis_agent.react import ReactWorkflow
 logger = logging.getLogger(__name__)
 
 
-class VisualizationOrchestrator:
+class VisualizationAgent:
     """
     A high-level orchestrator for the visualization agent.
     It initializes and runs the ReAct workflow to generate a visualization

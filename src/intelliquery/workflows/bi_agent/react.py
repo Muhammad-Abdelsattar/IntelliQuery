@@ -11,7 +11,7 @@ from ...models.bi_agent.state import BIAgentState
 from ...models.bi_agent.agent_io import Reflection
 from ...models.sql_agent.public import SQLResult
 from ...agents.sql_agent import SQLAgent
-from ...agents.vis_agent import VisualizationOrchestrator
+from ...agents.vis_agent import VisualizationAgent
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class ReactWorkflow:
         self,
         llm_interface: LLMInterface,
         sql_agent: SQLAgent,
-        vis_agent: VisualizationOrchestrator,
+        vis_agent: VisualizationAgent,
     ):
         self.llm_interface = llm_interface
         prompts_base_path = importlib.resources.files("intelliquery") / "prompts"

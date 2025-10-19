@@ -1,6 +1,6 @@
 from .agents.sql_agent import SQLAgent
 from .agents.bi_agent import BIOrchestrator
-from .agents.vis_agent import VisualizationOrchestrator
+from .agents.vis_agent import VisualizationAgent
 from .core.database_analyzer import DBContextAnalyzer
 from .core.database import DatabaseService
 from .core.exceptions import (
@@ -17,7 +17,7 @@ from .models.vis_agent.public import VisualizationResult
 __all__ = [
     "SQLAgent",
     "BIOrchestrator",
-    "VisualizationOrchestrator",
+    "VisualizationAgent",
     "DBContextAnalyzer",
     "DatabaseService",
     "FileSystemCacheProvider",
