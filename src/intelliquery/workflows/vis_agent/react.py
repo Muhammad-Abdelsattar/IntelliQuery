@@ -115,6 +115,8 @@ class ReactWorkflow:
         final_visualization = None
         error = None
 
+        tool_function_name = state["visualization_agent_framework"][tool_name]
+
         try:
             print(tool_name)
             print(tool_name)
