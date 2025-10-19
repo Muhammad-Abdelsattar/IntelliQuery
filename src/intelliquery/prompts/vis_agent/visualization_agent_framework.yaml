@@ -36,13 +36,6 @@ visualization_agent_framework:
         MULTIVARIATE_ANALYSIS: Examine multiple variables simultaneously
         CLUSTER_ANALYSIS: Identify natural groupings in data
         BUBBLE_RELATIONSHIPS: Show relationships with additional size dimension
-    GEOGRAPHIC_ANALYSIS:
-      description: Visualize data with spatial or location components
-      subtypes:
-        REGIONAL_COMPARISON: Compare values across geographic regions
-        POINT_DISTRIBUTION: Show specific locations on map
-        DENSITY_HEATMAP: Display concentration intensity across areas
-        FLOW_ANALYSIS: Show movement between locations
     PROCESS_FLOW:
       description: Analyze stages, sequences, and conversion in processes
       subtypes:
@@ -300,37 +293,6 @@ visualization_agent_framework:
             dimensions: list_of_categorical
         best_for_subtypes:
         - CATEGORICAL_RELATIONSHIPS
-    GEOGRAPHIC_ANALYSIS:
-      choropleth_map:
-        function: px.choropleth
-        description: Thematic map with regions colored by value
-        data_requirements:
-          required_columns:
-            locations: geographic_codes
-            color: numerical
-        best_for_subtypes:
-        - REGIONAL_COMPARISON
-      scatter_map:
-        function: px.scatter_geo
-        description: Points on map with optional size/color encoding
-        data_requirements:
-          required_columns:
-            lat: latitude
-            lon: longitude
-          optional_columns:
-            size: numerical
-            color: categorical
-        best_for_subtypes:
-        - POINT_DISTRIBUTION
-      density_mapbox:
-        function: px.density_mapbox
-        description: Heatmap showing point density on map
-        data_requirements:
-          required_columns:
-            lat: latitude
-            lon: longitude
-        best_for_subtypes:
-        - DENSITY_HEATMAP
     PROCESS_FLOW:
       funnel_chart:
         function: px.funnel
@@ -432,41 +394,3 @@ visualization_agent_framework:
         best_for_subtypes:
         - TREE_STRUCTURE
         - DRLL_DOWN_ANALYSIS
-  bi_pattern_mapping:
-    sales_comparison_by_region:
-      primary_goal: COMPARE_CATEGORIES
-      subtype: RANKING
-      recommended_charts:
-      - bar_chart
-      - horizontal_bar_chart
-    monthly_revenue_trend:
-      primary_goal: SHOW_TRENDS
-      subtype: CONTINUOUS_TREND
-      recommended_charts:
-      - line_chart
-      - area_chart
-    customer_segmentation:
-      primary_goal: DISTRIBUTION_ANALYSIS
-      subtype: MULTI_VARIABLE_DISTRIBUTION
-      recommended_charts:
-      - scatter_plot
-      - violin_plot
-      - box_plot
-    market_share_analysis:
-      primary_goal: PART_TO_WHOLE
-      subtype: SIMPLE_COMPOSITION
-      recommended_charts:
-      - pie_chart
-      - treemap
-    sales_conversion_funnel:
-      primary_goal: PROCESS_FLOW
-      subtype: CONVERSION_FUNNEL
-      recommended_charts:
-      - funnel_chart
-      - funnel_area
-    regional_performance_map:
-      primary_goal: GEOGRAPHIC_ANALYSIS
-      subtype: REGIONAL_COMPARISON
-      recommended_charts:
-      - choropleth_map
-      - scatter_map

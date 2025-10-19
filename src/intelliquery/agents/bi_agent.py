@@ -10,7 +10,7 @@ from ..models.bi_agent.public import BIResult
 from ..models.bi_agent.state import BIAgentState
 from ..workflows.bi_agent.react import ReactWorkflow
 from .sql_agent import SQLAgent
-from .vis_agent import VisualizationOrchestrator
+from .vis_agent import VisualizationAgent
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class BIOrchestrator:
         self,
         llm_interface: LLMInterface,
         sql_agent: SQLAgent,
-        vis_agent: VisualizationOrchestrator,
+        vis_agent: VisualizationAgent,
     ):
         self.llm_interface = llm_interface
         

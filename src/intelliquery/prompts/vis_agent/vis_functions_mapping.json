@@ -1,10 +1,8 @@
 {
     "bar_chart": "px.bar",
     "horizontal_bar_chart": "px.bar",
-    "radar_chart": "go.Figure(go.Scatterpolar())",
     "line_chart": "px.line",
     "area_chart": "px.area",
-    "waterfall_chart": "go.Figure(go.Waterfall())",
     "histogram": "px.histogram",
     "box_plot": "px.box",
     "violin_plot": "px.violin",
@@ -23,11 +21,7 @@
     "density_mapbox": "px.density_mapbox",
     "funnel_chart": "px.funnel",
     "funnel_area": "px.funnel_area",
-    "sankey_diagram": "go.Figure(go.Sankey())",
     "timeline_chart": "px.timeline",
-    "indicator_gauge": "go.Figure(go.Indicator())",
-    "bullet_chart": "go.Figure()",
     "anomaly_scatter": "px.scatter",
-    "control_chart": "go.Figure()",
     "icicle_chart": "px.icicle"
 }

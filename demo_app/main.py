@@ -31,7 +31,7 @@ from intelliquery import (
     BIOrchestrator,
     BIResult,
     SQLAgent,
-    VisualizationOrchestrator,
+    VisualizationAgent,
 )
 from intelliquery.workflows.sql_agent.simple import SimpleWorkflow
 from services import chat_service, connection_service, llm_service
@@ -112,7 +112,9 @@ def render_connection_manager_page():
 
                     # --- Deletion Logic ---
                     if st.session_state.confirming_delete_index == i:
-                        st.warning(f"Are you sure you want to delete **{conn['name']}**?")
+                        st.warning(
+                            f"Are you sure you want to delete **{conn['name']}**?"
+                        )
                         c1, c2, _ = st.columns([1, 1, 2])
                         if c1.button("✅ Confirm Delete", key=f"confirm_delete_{i}"):
                             state.connections.pop(i)
@@ -193,7 +195,9 @@ def render_chat_page():
     state = get_state()
 
     if not state.selected_connection:
-        st.info("Please select a database connection from the sidebar to start chatting.")
+        st.info(
+            "Please select a database connection from the sidebar to start chatting."
+        )
         st.stop()
 
     if not state.services_initialized:
@@ -250,7 +254,7 @@ def initialize_chat_services(state: AppState):
             db_service=db_service,
             workflow=sql_workflow,
         )
-        vis_agent = VisualizationOrchestrator(llm_interface=llm_interface)
+        vis_agent = VisualizationAgent(llm_interface=llm_interface)
 
         orchestrator = BIOrchestrator(
             llm_interface=llm_interface,
@@ -394,7 +398,7 @@ def process_agent_result(result: BIResult, status) -> Dict[str, Any]:
                 "content_type": "text",
                 "content": result.final_answer,
             }
-        
+
         # Otherwise, it's a full BI result
         return {
             "role": "assistant",
@@ -406,7 +410,7 @@ def process_agent_result(result: BIResult, status) -> Dict[str, Any]:
                 "visualization_params": result.visualization_params,
             },
         }
-    else: # Fallback for unknown status
+    else:  # Fallback for unknown status
         status.update(label="An unknown error occurred.", state="error")
         return {
             "role": "assistant",
@@ -415,7 +419,9 @@ def process_agent_result(result: BIResult, status) -> Dict[str, Any]:
         }
 
 
-def handle_regeneration(message_data: Dict[str, Any]) -> Tuple[Optional[pd.DataFrame], Optional[Any]]:
+def handle_regeneration(
+    message_data: Dict[str, Any],
+) -> Tuple[Optional[pd.DataFrame], Optional[Any]]:
     """
     Callback function to deterministically regenerate results (data + viz)
     from saved parameters in the chat history.
@@ -443,14 +449,16 @@ def handle_regeneration(message_data: Dict[str, Any]) -> Tuple[Optional[pd.DataF
             args_copy["data_frame"] = df  # Inject the fresh dataframe
 
             vis_func_name = tool_name.replace("_chart", "")
-            
+
             if hasattr(px, vis_func_name):
                 vis_func = getattr(px, vis_func_name)
                 fig = vis_func(**args_copy)
                 fig.update_layout(template="plotly_white")
             else:
-                st.error(f"Visualization function '{vis_func_name}' not found in Plotly Express.")
-        
+                st.error(
+                    f"Visualization function '{vis_func_name}' not found in Plotly Express."
+                )
+
         return df, fig
 
     except Exception as e:
