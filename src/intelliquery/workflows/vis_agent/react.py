@@ -2,12 +2,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import logging
-import yaml
+import json
 from typing import Dict, Any, List
+import importlib.resources
 
 from langgraph.graph import StateGraph, END
 from nexus_llm import LLMInterface, FileSystemPromptProvider
-import importlib.resources
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -30,6 +30,9 @@ class ReactWorkflow:
         self.llm_interface = llm_interface
         prompts_base_path = importlib.resources.files("intelliquery") / "prompts"
         self.prompt_provider = FileSystemPromptProvider(base_path=prompts_base_path)
+
+        with open(prompts_base_path / "vis_agent" / "vis_functions_mapping.json") as f:
+            self.vis_functions_mapping = json.load(f)
 
     def build_graph(self) -> StateGraph:
         """Builds the LangGraph workflow for the ReAct loop."""
@@ -115,33 +118,28 @@ class ReactWorkflow:
         final_visualization = None
         error = None
 
-        tool_function_name = state["visualization_agent_framework"][tool_name]
+        tool_function = self.vis_functions_mapping[tool_name].split(".")[-1]
 
         try:
-            print(tool_name)
-            print(tool_name)
-            if not hasattr(px, tool_name):
+            if not hasattr(px, tool_function):
                 raise NotImplementedError(
                     f"Chart type '{tool_name}' requires go.Figure and is not yet supported in this dynamic workflow."
                 )
-                # Fallback for go.Figure charts like Waterfall, Sankey, etc.
-                # if tool_name in ['waterfall_chart', 'sankey_diagram', 'indicator_gauge', 'bullet_chart', 'control_chart', 'radar_chart']:
-                #      # These are more complex and might need specific handling
-                #      raise NotImplementedError(f"Chart type '{tool_name}' requires go.Figure and is not yet supported in this dynamic workflow.")
-                # else:
-                #     raise ValueError(f"Unknown visualization tool: '{tool_name}'")
+            # Fallback for go.Figure charts like Waterfall, Sankey, etc.
+            # if tool_name in ['waterfall_chart', 'sankey_diagram', 'indicator_gauge', 'bullet_chart', 'control_chart', 'radar_chart']:
+            #      # These are more complex and might need specific handling
+            #      raise NotImplementedError(f"Chart type '{tool_name}' requires go.Figure and is not yet supported in this dynamic workflow.")
+            # else:
+            #     raise ValueError(f"Unknown visualization tool: '{tool_name}'")
 
-            vis_func = getattr(px, tool_name)
+            vis_func = getattr(px, tool_function)
 
-            print(tool_name)
 
             # Pass the dataframe as the first argument if not explicitly named
             if "data_frame" not in args:
                 args["data_frame"] = state["dataframe"]
 
-            # args.pop("metadata", None)
-            print(args)
-            fig = vis_func(**args)
+            fig = vis_func(data_frame=state["dataframe"], **args["arguments"])
             fig.update_layout(template="plotly_white")  # Apply a clean template
 
             observation = f"Successfully generated '{tool_name}'."
