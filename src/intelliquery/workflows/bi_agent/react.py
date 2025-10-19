@@ -12,7 +12,7 @@ from ...models.bi_agent.agent_io import Reflection
 from ...models.sql_agent.public import SQLResult
 from ...agents.sql_agent import SQLAgent
 from ...agents.vis_agent import VisualizationOrchestrator
-from ...core.database import DatabaseService
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,18 +24,14 @@ class ReactWorkflow:
     def __init__(
         self,
         llm_interface: LLMInterface,
-        db_service: DatabaseService,
+        sql_agent: SQLAgent,
+        vis_agent: VisualizationOrchestrator,
     ):
         self.llm_interface = llm_interface
-        self.db_service = db_service
         prompts_base_path = importlib.resources.files("intelliquery") / "prompts"
         self.prompt_provider = FileSystemPromptProvider(base_path=prompts_base_path)
-        self.sql_agent = SQLAgent(
-            llm_interface=llm_interface,
-            db_service=db_service,
-            workflow_type="simple",
-        )
-        self.vis_agent = VisualizationOrchestrator(llm_interface=llm_interface)
+        self.sql_agent = sql_agent
+        self.vis_agent = vis_agent
 
     def build_graph(self) -> StateGraph:
         """Builds the LangGraph workflow for the ReAct loop."""

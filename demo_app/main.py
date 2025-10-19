@@ -30,7 +30,10 @@ from intelliquery import (
     FileSystemCacheProvider,
     BIOrchestrator,
     BIResult,
+    SQLAgent,
+    VisualizationOrchestrator,
 )
+from intelliquery.workflows.sql_agent.simple import SimpleWorkflow
 from services import chat_service, connection_service, llm_service
 from state import AppState, get_state
 from ui_components import chat_renderer, sidebar
@@ -242,9 +245,17 @@ def initialize_chat_services(state: AppState):
             business_context=state.business_context
         )
 
+        sql_workflow = SimpleWorkflow(llm_interface, db_service)
+        sql_agent = SQLAgent(
+            db_service=db_service,
+            workflow=sql_workflow,
+        )
+        vis_agent = VisualizationOrchestrator(llm_interface=llm_interface)
+
         orchestrator = BIOrchestrator(
             llm_interface=llm_interface,
-            db_service=db_service,
+            sql_agent=sql_agent,
+            vis_agent=vis_agent,
         )
 
         state.db_service = db_service

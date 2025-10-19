@@ -9,6 +9,8 @@ from ..models.sql_agent.public import EnrichedDatabaseContext
 from ..models.bi_agent.public import BIResult
 from ..models.bi_agent.state import BIAgentState
 from ..workflows.bi_agent.react import ReactWorkflow
+from .sql_agent import SQLAgent
+from .vis_agent import VisualizationOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +25,12 @@ class BIOrchestrator:
     def __init__(
         self,
         llm_interface: LLMInterface,
-        db_service: DatabaseService,
+        sql_agent: SQLAgent,
+        vis_agent: VisualizationOrchestrator,
     ):
         self.llm_interface = llm_interface
-        self.db_service = db_service
         
-        workflow = ReactWorkflow(llm_interface, db_service)
+        workflow = ReactWorkflow(llm_interface, sql_agent, vis_agent)
         self.app = workflow.compile()
 
     def _prepare_initial_state(
