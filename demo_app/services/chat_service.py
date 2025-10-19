@@ -28,7 +28,7 @@ def ensure_chat_history_dir():
 
 def save_chat_history(chat_id: str, connection_name: str, history: List[Dict[str, Any]]):
     """
-    Saves a chat history to a JSON file.
+    Saves a chat history to a JSON file, removing non-serializable objects.
 
     Args:
         chat_id: The unique identifier for the chat session.
@@ -37,20 +37,19 @@ def save_chat_history(chat_id: str, connection_name: str, history: List[Dict[str
     """
     ensure_chat_history_dir()
 
-    # Deepcopy to avoid modifying the original history object in memory
+    # Create a deepcopy to avoid modifying the live state object in the app
     serializable_history = copy.deepcopy(history)
 
-    # Remove non-serializable data (like DataFrames) before saving
+    # Iterate through all messages and remove non-serializable objects before saving.
     for message in serializable_history:
-        if message.get("content_type") == "result":
-            data = message.get("data", {})
-            if "dataframe" in data:
-                del data["dataframe"]
+        if "data" in message and isinstance(message["data"], dict):
+            # Use .pop() with a default to safely remove keys that may not exist.
+            message["data"].pop("dataframe", None)
+            message["data"].pop("visualization", None)
 
-    # The payload includes the connection name to restore the session context
     payload = {
         "connection_name": connection_name,
-        "messages": serializable_history
+        "messages": serializable_history,
     }
 
     file_path = os.path.join(CHAT_HISTORY_DIR, f"{chat_id}.json")
@@ -95,12 +94,14 @@ def list_chat_sessions() -> List[Dict[str, str]]:
         if filename.endswith(".json"):
             chat_id = filename.replace(".json", "")
             try:
-                # Load the history to get the first user message for a display name
                 _, history = load_chat_history(chat_id)
-                first_message = history[0]['content'] if history and history[0]['role'] == 'user' else 'Chat Session'
+                first_message = (
+                    history[0]["content"]
+                    if history and history[0]["role"] == "user"
+                    else "Chat Session"
+                )
                 sessions.append({"id": chat_id, "name": first_message[:50]})
             except (IndexError, KeyError):
-                # Handle cases where the history is empty or malformed
                 continue
     return sessions
 
@@ -123,18 +124,22 @@ def get_conversation_history(
         current_msg = chat_history[i]
         next_msg = chat_history[i + 1]
 
-        # We are looking for a user message followed by an assistant message
         if current_msg.get("role") == "user" and next_msg.get("role") == "assistant":
             user_question = current_msg.get("content", "")
             ai_answer = ""
             content_type = next_msg.get("content_type", "text")
+            data = next_msg.get("data", {})
 
-            # Extract the relevant part of the assistant's response for the history
-            if content_type in ["text", "error"]:
+            # Construct a richer summary of the AI's response for the history
+            if content_type == "bi_result":
+                final_answer = data.get("final_answer", "")
+                sql_query = data.get("sql_query", "")
+                ai_answer = f"{final_answer}"
+                if sql_query:
+                    ai_answer += f"\n[Generated SQL: {sql_query}]"
+
+            elif content_type in ["text", "error"]:
                 ai_answer = next_msg.get("content", "")
-            elif content_type == "result":
-                # For results, the SQL query is the most important part of the answer
-                ai_answer = next_msg.get("data", {}).get("sql_query", "")
 
             if user_question and ai_answer:
                 conversation_history.append((user_question, ai_answer))

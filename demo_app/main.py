@@ -20,15 +20,16 @@ import streamlit as st
 from dotenv import load_dotenv
 from nexus_llm import load_settings
 from sqlalchemy import create_engine
+import plotly.express as px
+
 
 # --- Internal Imports ---
 from intelliquery import (
     DBContextAnalyzer,
     DatabaseService,
     FileSystemCacheProvider,
-    QueryOrchestrator,
-    SQLPlan,
-    SQLResult,
+    BIOrchestrator,
+    BIResult,
 )
 from services import chat_service, connection_service, llm_service
 from state import AppState, get_state
@@ -48,13 +49,14 @@ st.set_page_config(
 # Page Rendering Functions
 # -----------------------------------------------------------------------------
 
+
 def render_home_page():
     """Renders the main welcome page."""
     state = get_state()
     st.title("Welcome to IntelliQuery 🧠")
     st.markdown(
         """
-        **Your intelligent assistant for talking to your databases.**
+        **Your intelligent BI assistant for talking to your databases.**
 
         Select a database connection from the sidebar to begin. If you haven't configured
         any, click **Manage Connections** to add your first one.
@@ -191,15 +193,14 @@ def render_chat_page():
         st.info("Please select a database connection from the sidebar to start chatting.")
         st.stop()
 
-    # Initialize services on the first visit to the chat page for a given connection
     if not state.services_initialized:
         initialize_chat_services(state)
 
-    st.title("💬 IntelliQuery Chat")
+    st.title("💬 IntelliQuery BI Chat")
 
     # Render the existing chat history
     for message in state.chat_history:
-        chat_renderer.render_message(message, run_query_and_display_results)
+        chat_renderer.render_message(message, handle_regeneration)
 
     # Handle new user input
     if prompt := st.chat_input("Ask a question about your data..."):
@@ -210,19 +211,18 @@ def render_chat_page():
 # Service Initialization and Handling
 # -----------------------------------------------------------------------------
 
+
 def initialize_chat_services(state: AppState):
     """
     Initializes all backend services (LLM, DB, Orchestrator) required for the
-    chat page. This is a heavy operation and is only run when necessary.
+    chat page.
     """
     with st.spinner("Initializing services, please wait..."):
-        # 1. Initialize the LLM Interface
         llm_interface = llm_service.get_llm_interface(state)
         if not llm_interface:
             st.error("LLM interface could not be initialized. Check settings.")
             st.stop()
 
-        # 2. Initialize Database Services
         try:
             resolved_url = connection_service.resolve_secrets_in_url(
                 state.selected_connection["url"]
@@ -238,22 +238,18 @@ def initialize_chat_services(state: AppState):
             st.error(f"Failed to connect to the database: {e}")
             st.stop()
 
-        # 3. Build the Enriched Context
         enriched_context = context_analyzer.build_context(
             business_context=state.business_context
         )
 
-        # 4. Initialize the Query Orchestrator
-        orchestrator = QueryOrchestrator(
+        orchestrator = BIOrchestrator(
             llm_interface=llm_interface,
             db_service=db_service,
-            workflow_type=state.workflow_mode,
         )
 
-        # 5. Store initialized services in the application state
         state.db_service = db_service
         state.context_analyzer = context_analyzer
-        state.query_orchestrator = orchestrator
+        state.bi_orchestrator = orchestrator
         state.enriched_context = enriched_context
         state.services_initialized = True
 
@@ -270,14 +266,12 @@ def handle_connection_form_submission(
         return
 
     try:
-        # Step 1: Test the database connection
         resolved_url = connection_service.resolve_secrets_in_url(url)
         engine = create_engine(resolved_url)
         with st.spinner("1/3 - Testing database connection..."):
             with engine.connect():
                 pass
 
-        # Step 2: Analyze the database schema to build the enriched context
         with st.spinner("2/3 - Analyzing database and building context..."):
             db_service = DatabaseService(
                 engine=engine,
@@ -291,7 +285,6 @@ def handle_connection_form_submission(
             )
             context_analyzer.build_context(business_context=business_context)
 
-        # Step 3: Save the connection details
         with st.spinner("3/3 - Saving connection..."):
             table_list = [t.strip() for t in tables.split(",") if t.strip()]
             new_conn = {
@@ -303,7 +296,6 @@ def handle_connection_form_submission(
             }
 
             if is_editing:
-                # Find and update the existing connection
                 for i, c in enumerate(state.connections):
                     if c["name"] == original_name:
                         state.connections[i] = new_conn
@@ -312,7 +304,7 @@ def handle_connection_form_submission(
                 state.connections.append(new_conn)
 
             state.save_and_reload_connections()
-            state.selected_connection = None  # Clear selection to exit edit mode
+            state.selected_connection = None
 
         st.success(f"Connection '{name}' saved and analyzed successfully!")
         st.rerun()
@@ -327,40 +319,35 @@ def handle_connection_form_submission(
 # Chat and Agent Interaction
 # -----------------------------------------------------------------------------
 
+
 def handle_user_prompt(state: AppState, prompt: str):
     """
     Handles the logic for processing a user's chat input, running the agent,
     and displaying the results.
     """
-    # 1. Add user message to history and display it
     user_message = {"role": "user", "content": prompt, "timestamp": time.time()}
     state.chat_history.append(user_message)
-    chat_renderer.render_message(user_message, run_query_and_display_results)
+    chat_renderer.render_message(user_message, handle_regeneration)
 
-    # 2. Get conversational history for the agent
     conversation_history = chat_service.get_conversation_history(state.chat_history)
 
-    # 3. Run the agent and process the result
     with st.chat_message("assistant"):
         with st.status("Agent is thinking...", expanded=True) as status:
-            status.write("Generating SQL plan...")
-            time.sleep(1)  # Simulate thought for better UX
+            status.write("Analyzing request and planning execution...")
+            time.sleep(1)
 
-            result = state.query_orchestrator.run(
+            result = state.bi_orchestrator.run(
                 question=prompt,
                 context=state.enriched_context,
                 chat_history=conversation_history,
-                auto_execute=state.agent_mode == "execute",
             )
 
             assistant_response = process_agent_result(result, status)
             assistant_response["timestamp"] = time.time()
 
-    # 4. Display the assistant's response and add it to history
-    chat_renderer.render_message(assistant_response, run_query_and_display_results)
+    chat_renderer.render_message(assistant_response, handle_regeneration)
     state.chat_history.append(assistant_response)
 
-    # 5. Save the updated chat history
     chat_service.save_chat_history(
         state.current_chat_id,
         state.selected_connection["name"],
@@ -368,78 +355,111 @@ def handle_user_prompt(state: AppState, prompt: str):
     )
 
 
-def process_agent_result(result, status) -> Dict[str, Any]:
+def process_agent_result(result: BIResult, status) -> Dict[str, Any]:
     """
-    Processes the result from the QueryOrchestrator and returns a message
+    Processes the result from the BIOrchestrator and returns a message
     dictionary suitable for rendering.
     """
-    if result.status == "success":
-        if isinstance(result, SQLPlan):
-            status.update(label="Plan generated successfully!", state="complete")
-            return {
-                "role": "assistant",
-                "content_type": "plan",
-                "data": {
-                    "sql_query": result.sql_query,
-                    "reasoning": result.reasoning,
-                    "is_validated": result.is_validated,
-                },
-            }
-        elif isinstance(result, SQLResult):
-            status.update(label="Query executed successfully!", state="complete")
-            return {
-                "role": "assistant",
-                "content_type": "result",
-                "data": {
-                    "dataframe": result.dataframe if result.dataframe is not None else pd.DataFrame(),
-                    "sql_query": result.sql_query,
-                    "reasoning": result.reasoning,
-                },
-            }
-    elif result.status == "clarification_needed":
+    if result.status == "clarification_needed":
         status.update(label="Agent needs more information.", state="complete")
         return {
             "role": "assistant",
             "content_type": "text",
-            "content": result.clarification_question,
+            "content": result.final_answer,
         }
-    else:  # Handle error cases
+    elif result.status == "error":
         status.update(label="An error occurred.", state="error")
         return {
             "role": "assistant",
             "content_type": "error",
             "content": result.error_message,
         }
+    elif result.status == "success":
+        status.update(label="Request processed successfully!", state="complete")
+        # If the successful result has no data or viz, treat it as a simple text response
+        if result.dataframe is None and result.visualization is None:
+            return {
+                "role": "assistant",
+                "content_type": "text",
+                "content": result.final_answer,
+            }
+        
+        # Otherwise, it's a full BI result
+        return {
+            "role": "assistant",
+            "content_type": "bi_result",
+            "data": {
+                "final_answer": result.final_answer,
+                "sql_query": result.sql_query,
+                "reasoning": result.reasoning,
+                "visualization_params": result.visualization_params,
+            },
+        }
+    else: # Fallback for unknown status
+        status.update(label="An unknown error occurred.", state="error")
+        return {
+            "role": "assistant",
+            "content_type": "error",
+            "content": "An unknown error occurred.",
+        }
 
 
-def run_query_and_display_results(sql_query: str):
+def handle_regeneration(message_data: Dict[str, Any]):
     """
-    Callback function to execute a SQL query and display the results or an error.
-    This is passed to the chat renderer for the "Run Query" button.
+    Callback function to deterministically regenerate results (data + viz)
+    from saved parameters in the chat history.
     """
     state = get_state()
     if not state.db_service:
         st.error("Database service not initialized.")
         return
 
-    with st.spinner("Executing query..."):
+    sql_query = message_data.get("sql_query")
+    vis_params = message_data.get("visualization_params")
+
+    if not sql_query:
+        st.warning("No SQL query found to regenerate results.")
+        return
+
+    with st.spinner("Executing query and regenerating results..."):
         try:
+            # 1. Always re-run the query to get fresh data
             df = state.db_service.execute_for_dataframe(sql_query)
             st.dataframe(df, use_container_width=True)
+
+            # 2. If there are visualization params, regenerate the chart
+            if vis_params and not df.empty:
+                tool_name = next(iter(vis_params))
+                args_copy = vis_params[tool_name]["arguments"].copy()
+                args_copy["data_frame"] = df # Inject the fresh dataframe
+
+                # Simplistic mapping for demo purposes
+                vis_func_name = tool_name.replace("_chart", "")
+                
+                if hasattr(px, vis_func_name):
+                    vis_func = getattr(px, vis_func_name)
+                    fig = vis_func(**args_copy)
+                    fig.update_layout(template="plotly_white")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.error(f"Visualization function '{vis_func_name}' not found in Plotly Express.")
+
+            elif vis_params and df.empty:
+                st.info("Cannot generate visualization as the query returned no data.")
+
         except Exception as e:
-            st.error(f"Failed to execute query: {e}")
+            st.error(f"Failed to regenerate results: {e}")
 
 
 # -----------------------------------------------------------------------------
 # Main Application Logic
 # -----------------------------------------------------------------------------
 
+
 def main():
     """Main function to run the Streamlit application."""
     state = get_state()
 
-    # --- One-time Initialization ---
-    # Load connections and LLM providers only once per session
     state.initialize_connections()
     if state.all_llm_providers is None:
         try:
@@ -451,12 +471,8 @@ def main():
             st.error("Fatal: llm_providers.yaml not found.")
             st.stop()
 
-    # --- Sidebar Navigation ---
-    # The sidebar is the main navigation hub and controls the app's state
     sidebar.build_sidebar()
 
-    # --- URL-based Chat Loading ---
-    # Allows sharing and bookmarking specific chat sessions
     url_chat_id = st.query_params.get("chat_id")
     if url_chat_id and url_chat_id != state.current_chat_id:
         conn_name, history = chat_service.load_chat_history(url_chat_id)
@@ -466,11 +482,8 @@ def main():
             state.set_page("chat")
             st.rerun()
         else:
-            # If the chat or connection is invalid, clear the query params
             st.query_params.clear()
 
-    # --- Page Routing ---
-    # Render the appropriate page based on the current state
     if state.page == "home":
         render_home_page()
     elif state.page == "connection_manager":

@@ -42,7 +42,7 @@ class FileSystemCacheProvider:
     Keys are hashed to create safe filenames.
     """
 
-    def __init__(self, cache_dir: Path = Path("cache/context_cache")):
+    def __init__(self, cache_dir: Path = Path(".cache/context_cache")):
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         logger.info(

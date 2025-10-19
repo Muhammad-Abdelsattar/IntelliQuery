@@ -125,21 +125,15 @@ class ReactWorkflow:
                 raise NotImplementedError(
                     f"Chart type '{tool_name}' requires go.Figure and is not yet supported in this dynamic workflow."
                 )
-            # Fallback for go.Figure charts like Waterfall, Sankey, etc.
-            # if tool_name in ['waterfall_chart', 'sankey_diagram', 'indicator_gauge', 'bullet_chart', 'control_chart', 'radar_chart']:
-            #      # These are more complex and might need specific handling
-            #      raise NotImplementedError(f"Chart type '{tool_name}' requires go.Figure and is not yet supported in this dynamic workflow.")
-            # else:
-            #     raise ValueError(f"Unknown visualization tool: '{tool_name}'")
 
             vis_func = getattr(px, tool_function)
 
+            # Create a temporary copy of the arguments for execution, injecting the dataframe
+            # This ensures the original toolset in the scratchpad remains serializable.
+            execution_args = args["arguments"].copy()
+            execution_args["data_frame"] = state["dataframe"]
 
-            # Pass the dataframe as the first argument if not explicitly named
-            if "data_frame" not in args:
-                args["data_frame"] = state["dataframe"]
-
-            fig = vis_func(data_frame=state["dataframe"], **args["arguments"])
+            fig = vis_func(**execution_args)
             fig.update_layout(template="plotly_white")  # Apply a clean template
 
             observation = f"Successfully generated '{tool_name}'."

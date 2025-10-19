@@ -43,11 +43,11 @@ class AppState:
         # Business context specific to the current chat session
         self.business_context: str = ""
 
-        # --- Agent & Core Services ---
+        # Agent & Core Services
         # These are placeholders for the heavy services that are initialized on demand
         self.db_service: Optional[Any] = None
         self.context_analyzer: Optional[Any] = None
-        self.query_orchestrator: Optional[Any] = None
+        self.bi_orchestrator: Optional[Any] = None
         self.enriched_context: Optional[Any] = None
         # A flag to indicate if the services have been initialized for the current connection
         self.services_initialized: bool = False
@@ -57,12 +57,6 @@ class AppState:
         self.all_llm_providers: Optional[Dict] = None
         # The key of the currently selected LLM provider for the session
         self.selected_llm_provider: Optional[str] = None
-
-        # --- UI Control ---
-        # The mode of the agent ("execute" or "plan")
-        self.agent_mode: str = "execute"
-        # The workflow to use for the agent ("simple" or "reflection")
-        self.workflow_mode: str = "simple"
 
     def initialize_connections(self):
         """Loads connections from the persistent storage into the state."""

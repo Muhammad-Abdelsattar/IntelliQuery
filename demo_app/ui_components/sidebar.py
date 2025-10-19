@@ -124,53 +124,6 @@ def build_sidebar():
                             f"Connection '{conn_name}' for this chat could not be found."
                         )
 
-        # --- Session-Specific Controls (only on Chat Page) ---
-        if state.page == "chat":
-            st.divider()
-            st.subheader("Session Controls")
-
-            # --- AI Model Selection ---
-            st.markdown("**AI Model**")
-            if state.all_llm_providers:
-                provider_keys = list(state.all_llm_providers.llm_providers.keys())
-                current_provider = state.selected_llm_provider or (provider_keys[0] if provider_keys else None)
-
-                selected_provider_key = st.selectbox(
-                    "Select the AI model for this session:",
-                    options=provider_keys,
-                    index=(
-                        provider_keys.index(current_provider)
-                        if current_provider in provider_keys
-                        else 0
-                    ),
-                    label_visibility="collapsed",
-                )
-
-                if selected_provider_key != state.selected_llm_provider:
-                    state.selected_llm_provider = selected_provider_key
-                    # Changing the model requires re-initializing the services
-                    state.services_initialized = False
-                    st.rerun()
-
-            # --- Workflow and Execution Mode ---
-            state.workflow_mode = st.radio(
-                "Workflow", ["simple", "reflection"], index=0, horizontal=True,
-                help="**Simple**: A single AI agent generates the query. **Reflection**: A second AI agent reviews and refines the query before it is shown."
-            )
-
-            agent_mode_options = {"Automatic": "execute", "Manual Approval": "plan"}
-            current_agent_mode_label = [k for k, v in agent_mode_options.items() if v == state.agent_mode][0]
-            available_labels = list(agent_mode_options.keys())
-
-            selected_label = st.radio(
-                "Execution Mode",
-                options=available_labels,
-                index=available_labels.index(current_agent_mode_label),
-                horizontal=True,
-                help="**Automatic**: The AI will run queries instantly. **Manual Approval**: The AI will generate a query and wait for you to run it.",
-            )
-            state.agent_mode = agent_mode_options[selected_label]
-
             # --- Business Context Override ---
             with st.expander("**Current Chat's Business Context**", expanded=False):
                 st.info("Define business rules, acronyms, or jargon for this session only.", icon="ℹ️")

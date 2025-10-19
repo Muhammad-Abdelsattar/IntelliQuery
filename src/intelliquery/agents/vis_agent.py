@@ -57,10 +57,16 @@ class VisualizationOrchestrator:
 
     def _format_output(self, final_state: VisAgentState) -> VisualizationResult:
         """Interprets the final state and formats the public-facing response."""
-        if final_state.get("final_visualization"):
+        final_visualization = final_state.get("final_visualization")
+        if final_visualization:
+            # Extract the toolset used from the last step in the scratchpad
+            last_reasoning, last_toolset, last_observation = final_state[
+                "agent_scratchpad"
+            ][-1]
             return VisualizationResult(
                 status="success",
-                visualization=final_state["final_visualization"],
+                visualization=final_visualization,
+                vis_params=last_toolset,
             )
         else:
             error_message = final_state.get("error") or "Unknown error occurred."

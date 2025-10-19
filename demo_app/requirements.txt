@@ -3,3 +3,7 @@ pandas
 sqlalchemy
 python-dotenv
 psycopg2-binary
+plotly
+nexus_llm
+langgraph
+pyyaml

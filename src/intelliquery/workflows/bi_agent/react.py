@@ -167,7 +167,6 @@ class ReactWorkflow:
                     user_question=state["natural_language_question"],
                     sql_result=sql_result_state,
                 )
-                vis_result_state = vis_result.visualization
 
                 if vis_result.status == "success":
                     observation = "Successfully generated visualization."
@@ -175,7 +174,7 @@ class ReactWorkflow:
                     observation = f"Visualization agent returned an error: {vis_result.error_message}"
                 
                 return {
-                    "visualization_result": vis_result_state,
+                    "visualization_result": vis_result, # Store the whole object
                     "intermediate_steps": state["intermediate_steps"][:-1]
                     + [(reasoning, (action, action_args), observation)],
                 }

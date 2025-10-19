@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Any, Literal
+from typing import Optional, Any, Literal, Dict
 
 import pandas as pd
 from pydantic import BaseModel, Field, ConfigDict
@@ -22,6 +22,15 @@ class BIResult(BaseModel):
     )
     visualization: Optional[Any] = Field(
         None, description="The visualization object, if one was created."
+    )
+    sql_query: Optional[str] = Field(
+        None, description="The SQL query generated during the process."
+    )
+    reasoning: Optional[str] = Field(
+        None, description="The consolidated reasoning from the agent's steps."
+    )
+    visualization_params: Optional[Dict[str, Any]] = Field(
+        None, description="The parameters needed to regenerate the visualization."
     )
     error_message: Optional[str] = Field(
         None, description="Details of the error if any step in the process failed."

@@ -55,31 +55,48 @@ class BIOrchestrator:
         """Interprets the final state and formats the public-facing response."""
         final_answer = final_state.get("final_answer") or ""
         sql_result = final_state.get("sql_result")
-        
-        # Check for clarification from the SQL agent
+        vis_result = final_state.get("visualization_result")
+        error = final_state.get("error")
+
+        # Consolidate reasoning from all steps
+        reasoning_steps = [step[0] for step in final_state.get("intermediate_steps", [])]
+        consolidated_reasoning = "\n".join(reasoning_steps)
+
+        # Extract SQL query and visualization params
+        sql_query = sql_result.sql_query if sql_result else None
+        vis_params = vis_result.vis_params if vis_result and hasattr(vis_result, 'vis_params') else None
+
+        # Handle clarification from the SQL agent
         if sql_result and sql_result.status == "clarification_needed":
             return BIResult(
                 status="clarification_needed",
-                final_answer=sql_result.clarification_question
+                final_answer=sql_result.clarification_question,
+                reasoning=consolidated_reasoning,
             )
 
-        # Check for clarification from the BI agent itself
-        # This is a simple heuristic based on the final answer content
-        if "?" in final_answer and len(final_answer) < 200: # Avoid flagging long text with questions
-             return BIResult(
+        # Handle clarification from the BI agent itself
+        if "?" in final_answer and len(final_answer) < 200:
+            return BIResult(
                 status="clarification_needed",
-                final_answer=final_answer
+                final_answer=final_answer,
+                reasoning=consolidated_reasoning,
             )
 
-        # Check for errors
-        error = final_state.get("error")
+        # Handle errors
         if error:
-            return BIResult(status="error", final_answer=final_answer, error_message=error)
+            return BIResult(
+                status="error",
+                final_answer=final_answer or "An error occurred.",
+                error_message=error,
+                reasoning=consolidated_reasoning,
+            )
         if sql_result and sql_result.status == "error":
             return BIResult(
-                status="error", 
-                final_answer=final_answer or "An error occurred during SQL generation or execution.",
-                error_message=sql_result.error_message
+                status="error",
+                final_answer=final_answer
+                or "An error occurred during SQL generation or execution.",
+                error_message=sql_result.error_message,
+                reasoning=consolidated_reasoning,
             )
 
         # Success case
@@ -87,7 +104,10 @@ class BIOrchestrator:
             status="success",
             final_answer=final_answer or "Request processed successfully.",
             dataframe=sql_result.dataframe if sql_result else None,
-            visualization=final_state.get("visualization_result"),
+            visualization=vis_result.visualization if vis_result else None,
+            sql_query=sql_query,
+            reasoning=consolidated_reasoning,
+            visualization_params=vis_params,
         )
 
     def run(

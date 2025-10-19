@@ -2,11 +2,9 @@
 UI component for rendering chat messages in the Streamlit application.
 
 This module is responsible for the visual representation of the conversation
-between the user and the AI agent. It handles different message types (user,
-assistant, error, plan, result) and formats them appropriately.
-
-By encapsulating the rendering logic here, the main application file is kept
-cleaner and more focused on orchestration rather than UI details.
+between the user and the AI agent. It handles different message types and
+formats them appropriately, including the new BI result format which can
+contain text, data, and visualizations.
 """
 
 import streamlit as st
@@ -15,75 +13,62 @@ from typing import Dict, Any, Callable
 import sqlparse
 
 
-def render_message(message: Dict[str, Any], run_query_func: Callable[[str], None]):
+def render_message(message: Dict[str, Any], regenerate_func: Callable[[Dict[str, Any]], None]):
     """
     Renders a single chat message based on its content and type.
 
-    This function uses `st.chat_message` and then inspects the message's
-    `role` and `content_type` to determine how to display it.
-
     Args:
-        message: A dictionary representing a single chat message. It should
-                 contain at least a 'role' and often a 'content_type'.
-        run_query_func: A callback function that is executed when the user
-                        clicks the "Run Query" button on a plan or result message.
+        message: A dictionary representing a single chat message.
+        regenerate_func: A callback function executed when the user clicks
+                         the "Regenerate" button.
     """
     role = message.get("role")
 
     with st.chat_message(role):
+        content_type = message.get("content_type", "text")
+
         # --- User Messages ---
         if role == "user":
             st.markdown(message.get("content"))
             return
 
-        # --- Assistant Messages ---
-        content_type = message.get("content_type", "text")
-
-        if content_type == "text":
-            # Simple text response from the assistant (e.g., a clarification question)
+        # --- Assistant Messages: Simple Text or Error ---
+        if content_type in ["text", "error"]:
             st.markdown(message.get("content"))
+            return
 
-        elif content_type == "error":
-            # An error message from the agent or system
-            st.error(message.get("content"))
-
-        elif content_type in ["plan", "result"]:
-            # A message containing a generated SQL query
+        # --- Assistant Messages: BI Result (Text + Regeneratable Data/Viz) ---
+        if content_type == "bi_result":
             data = message.get("data", {})
+            final_answer = data.get("final_answer", "No answer provided.")
             sql_query = data.get("sql_query", "No SQL available.")
             reasoning = data.get("reasoning", "No reasoning provided.")
 
-            # Display the formatted SQL query
-            st.markdown("Here is the generated query:")
-            formatted_sql = sqlparse.format(
-                sql_query, reindent=True, keyword_case="upper"
-            )
-            st.code(formatted_sql, language="sql")
+            # 1. Display the agent's textual answer
+            st.markdown(final_answer)
 
-            # Provide a button to execute the query manually
-            # The key is made unique using the message timestamp to avoid conflicts
-            if st.button("▶️ Run Query", key=f"run_{message['timestamp']}"):
-                run_query_func(sql_query)
+            # 2. Display the details in an expander
+            with st.expander("Show Details"):
+                st.markdown("**Agent's Reasoning:**")
+                st.markdown(reasoning or "_No reasoning provided._")
+                st.markdown("**Generated SQL Query:**")
+                formatted_sql = sqlparse.format(
+                    sql_query, reindent=True, keyword_case="upper"
+                )
+                st.code(formatted_sql, language="sql")
 
-            # Show the agent's reasoning in an expander
-            with st.expander("Show Agent's Reasoning"):
-                st.markdown(reasoning or "_The agent did not provide specific reasoning._")
+            # 3. The button to trigger regeneration
+            if st.button("🔄 Regenerate", key=f"regen_{message['timestamp']}"):
+                # We store the key of the message being regenerated in session state
+                st.session_state.regenerating_key = f"regen_{message['timestamp']}"
 
-            # --- Displaying Query Results ---
-            # If it's a result message, also show the dataframe
-            if content_type == "result":
-                df = data.get("dataframe")
-                if df is not None and not df.empty:
-                    st.markdown("--- ")
-                    st.markdown("**Query Results:**")
-                    st.dataframe(df, use_container_width=True)
-                    # Allow downloading the results as a CSV
-                    st.download_button(
-                        label="Download as CSV",
-                        data=df.to_csv(index=False).encode("utf-8"),
-                        file_name="query_results.csv",
-                        mime="text/csv",
-                        key=f"download_{message['timestamp']}",
-                    )
-                else:
-                    st.info("The query executed successfully but returned no results.")
+            # 4. The container where results will appear after regeneration
+            results_container = st.container()
+
+            # Check if this specific message is the one being regenerated
+            if st.session_state.get("regenerating_key") == f"regen_{message['timestamp']}":
+                with results_container:
+                    # Call the regeneration function from main.py
+                    regenerate_func(data)
+                # Clear the flag after regeneration to prevent re-triggering
+                st.session_state.regenerating_key = None
