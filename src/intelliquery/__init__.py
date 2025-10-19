@@ -1,4 +1,4 @@
-from .agents.sql_agent import QueryOrchestrator
+from .agents.sql_agent import SQLAgent
 from .agents.bi_agent import BIOrchestrator
 from .agents.vis_agent import VisualizationOrchestrator
 from .core.database_analyzer import DBContextAnalyzer
@@ -15,7 +15,7 @@ from .models.vis_agent.public import VisualizationResult
 
 
 __all__ = [
-    "QueryOrchestrator",
+    "SQLAgent",
     "BIOrchestrator",
     "VisualizationOrchestrator",
     "DBContextAnalyzer",

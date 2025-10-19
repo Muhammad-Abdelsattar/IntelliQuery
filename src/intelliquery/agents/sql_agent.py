@@ -13,7 +13,7 @@ from ..workflows.sql_agent.reflection import ReflectionWorkflow
 logger = logging.getLogger(__name__)
 
 
-class QueryOrchestrator:
+class SQLAgent:
     """
     A high-level orchestrator for text-to-SQL workflows.
     It initializes and runs a selected workflow (e.g., simple, reflection)

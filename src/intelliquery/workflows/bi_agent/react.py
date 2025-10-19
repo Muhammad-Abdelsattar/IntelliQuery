@@ -10,7 +10,7 @@ import importlib.resources
 from ...models.bi_agent.state import BIAgentState
 from ...models.bi_agent.agent_io import Reflection
 from ...models.sql_agent.public import SQLResult
-from ...agents.sql_agent import QueryOrchestrator
+from ...agents.sql_agent import SQLAgent
 from ...agents.vis_agent import VisualizationOrchestrator
 from ...core.database import DatabaseService
 
@@ -30,7 +30,7 @@ class ReactWorkflow:
         self.db_service = db_service
         prompts_base_path = importlib.resources.files("intelliquery") / "prompts"
         self.prompt_provider = FileSystemPromptProvider(base_path=prompts_base_path)
-        self.sql_agent = QueryOrchestrator(
+        self.sql_agent = SQLAgent(
             llm_interface=llm_interface,
             db_service=db_service,
             workflow_type="simple",
