@@ -27,7 +27,7 @@ def build_sidebar():
 
     with st.sidebar:
         st.header("IntelliQuery")
-        st.markdown("Your AI Database Assistant")
+        st.markdown("Your AI Database & BI Assistant")
 
         # --- Page Navigation ---
         # These buttons update the `page` attribute in the app state, which the
@@ -126,7 +126,10 @@ def build_sidebar():
 
             # --- Business Context Override ---
             with st.expander("**Current Chat's Business Context**", expanded=False):
-                st.info("Define business rules, acronyms, or jargon for this session only.", icon="ℹ️")
+                st.info(
+                    "Define business rules, acronyms, or jargon for this session only.",
+                    icon="ℹ️",
+                )
                 default_context = (
                     state.selected_connection.get("business_context", "")
                     if state.selected_connection
@@ -138,3 +141,4 @@ def build_sidebar():
                     height=200,
                     label_visibility="collapsed",
                 )
+

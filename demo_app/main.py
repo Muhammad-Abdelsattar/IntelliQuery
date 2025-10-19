@@ -12,7 +12,7 @@ rendered based on the application's state.
 # --- Core Imports ---
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 # --- Library Imports ---
 import pandas as pd
@@ -404,51 +404,47 @@ def process_agent_result(result: BIResult, status) -> Dict[str, Any]:
         }
 
 
-def handle_regeneration(message_data: Dict[str, Any]):
+def handle_regeneration(message_data: Dict[str, Any]) -> Tuple[Optional[pd.DataFrame], Optional[Any]]:
     """
     Callback function to deterministically regenerate results (data + viz)
     from saved parameters in the chat history.
+    Returns the dataframe and the figure object.
     """
     state = get_state()
     if not state.db_service:
         st.error("Database service not initialized.")
-        return
+        return None, None
 
     sql_query = message_data.get("sql_query")
     vis_params = message_data.get("visualization_params")
 
     if not sql_query:
         st.warning("No SQL query found to regenerate results.")
-        return
+        return None, None
 
-    with st.spinner("Executing query and regenerating results..."):
-        try:
-            # 1. Always re-run the query to get fresh data
-            df = state.db_service.execute_for_dataframe(sql_query)
-            st.dataframe(df, use_container_width=True)
+    try:
+        df = state.db_service.execute_for_dataframe(sql_query)
+        fig = None
 
-            # 2. If there are visualization params, regenerate the chart
-            if vis_params and not df.empty:
-                tool_name = next(iter(vis_params))
-                args_copy = vis_params[tool_name]["arguments"].copy()
-                args_copy["data_frame"] = df # Inject the fresh dataframe
+        if vis_params and not df.empty:
+            tool_name = next(iter(vis_params))
+            args_copy = vis_params[tool_name]["arguments"].copy()
+            args_copy["data_frame"] = df  # Inject the fresh dataframe
 
-                # Simplistic mapping for demo purposes
-                vis_func_name = tool_name.replace("_chart", "")
-                
-                if hasattr(px, vis_func_name):
-                    vis_func = getattr(px, vis_func_name)
-                    fig = vis_func(**args_copy)
-                    fig.update_layout(template="plotly_white")
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.error(f"Visualization function '{vis_func_name}' not found in Plotly Express.")
+            vis_func_name = tool_name.replace("_chart", "")
+            
+            if hasattr(px, vis_func_name):
+                vis_func = getattr(px, vis_func_name)
+                fig = vis_func(**args_copy)
+                fig.update_layout(template="plotly_white")
+            else:
+                st.error(f"Visualization function '{vis_func_name}' not found in Plotly Express.")
+        
+        return df, fig
 
-            elif vis_params and df.empty:
-                st.info("Cannot generate visualization as the query returned no data.")
-
-        except Exception as e:
-            st.error(f"Failed to regenerate results: {e}")
+    except Exception as e:
+        st.error(f"Failed to regenerate results: {e}")
+        return None, None
 
 
 # -----------------------------------------------------------------------------
