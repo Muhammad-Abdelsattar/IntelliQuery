@@ -11,23 +11,10 @@ from ...models.bi_agent.state import BIAgentState
 from ...models.bi_agent.agent_io import Reflection
 from ...models.sql_agent.public import SQLResult
 from ...agents.sql_agent import QueryOrchestrator
+from ...agents.vis_agent import VisualizationOrchestrator
 from ...core.database import DatabaseService
 
 logger = logging.getLogger(__name__)
-
-
-def visualization_agent_tool(sql_query: str, instruction: str) -> Dict[str, Any]:
-    """Placeholder for the visualization agent."""
-    logger.info(
-        f"--- Executing Visualization Agent (Placeholder) ---\n"
-        f"SQL Query: {sql_query}\nInstruction: {instruction}"
-    )
-    # In the future, this would return a chart object or file path
-    return {
-        "status": "success",
-        "message": "Placeholder visualization created successfully.",
-    }
-
 
 class ReactWorkflow:
     """
@@ -48,6 +35,7 @@ class ReactWorkflow:
             db_service=db_service,
             workflow_type="simple",
         )
+        self.vis_agent = VisualizationOrchestrator(llm_interface=llm_interface)
 
     def build_graph(self) -> StateGraph:
         """Builds the LangGraph workflow for the ReAct loop."""
@@ -140,6 +128,7 @@ class ReactWorkflow:
 
         observation = ""
         sql_result_state = state.get("sql_result")
+        vis_result_state = state.get("visualization_result")
 
         try:
             if action == "sql_agent":
@@ -169,17 +158,24 @@ class ReactWorkflow:
                     observation = f"SQL agent returned an error: {result.error_message}"
 
             elif action == "visualization_agent":
-                sql_query = action_args.get("sql_query")
-                instruction = action_args.get("instruction")
-                if not sql_query or not instruction:
+                if not sql_result_state or sql_result_state.status != "success":
                     raise ValueError(
-                        "Missing 'sql_query' or 'instruction' for visualization_agent."
+                        "Cannot run visualization agent without a successful SQL result."
                     )
 
-                vis_result = visualization_agent_tool(sql_query, instruction)
-                observation = vis_result["message"]
+                vis_result = self.vis_agent.run(
+                    user_question=state["natural_language_question"],
+                    sql_result=sql_result_state,
+                )
+                vis_result_state = vis_result.visualization
+
+                if vis_result.status == "success":
+                    observation = "Successfully generated visualization."
+                else:
+                    observation = f"Visualization agent returned an error: {vis_result.error_message}"
+                
                 return {
-                    "visualization_result": vis_result,
+                    "visualization_result": vis_result_state,
                     "intermediate_steps": state["intermediate_steps"][:-1]
                     + [(reasoning, (action, action_args), observation)],
                 }

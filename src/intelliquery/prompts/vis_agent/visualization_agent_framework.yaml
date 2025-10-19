@@ -1,0 +1,472 @@
+visualization_agent_framework:
+  version: '1.0'
+  primary_analytical_goals:
+    COMPARE_CATEGORIES:
+      description: Compare values across different categories or groups
+      subtypes:
+        RANKING: Compare and rank categories by value
+        TIME_PERIOD_COMPARISON: Compare same metric across different time periods
+        BENCHMARK_COMPARISON: Compare actual vs target values
+        COMPOSITION_COMPARISON: Compare part-to-whole across multiple categories
+    SHOW_TRENDS:
+      description: Analyze patterns and movements over time
+      subtypes:
+        CONTINUOUS_TREND: Show smooth progression over time
+        SEASONAL_PATTERNS: Identify recurring seasonal patterns
+        GROWTH_RATES: Show percentage changes over periods
+        CUMULATIVE_PROGRESS: Track running totals over time
+    DISTRIBUTION_ANALYSIS:
+      description: Understand how values are spread across a range
+      subtypes:
+        FREQUENCY_DISTRIBUTION: Show how often values occur in ranges
+        STATISTICAL_SUMMARY: Display quartiles, outliers, and central tendency
+        PROBABILITY_DENSITY: Show continuous distribution patterns
+        MULTI_VARIABLE_DISTRIBUTION: Compare distributions across categories
+    PART_TO_WHOLE:
+      description: Show how components contribute to a total
+      subtypes:
+        SIMPLE_COMPOSITION: Basic proportion display for few categories
+        HIERARCHICAL_COMPOSITION: Nested part-to-whole relationships
+        STACKED_COMPARISON: Compare compositions across categories
+        PROGRESSIVE_COMPOSITION: Show changing composition over time
+    RELATIONSHIP_ANALYSIS:
+      description: Explore correlations and connections between variables
+      subtypes:
+        CORRELATION_SCATTER: Show relationship between two numeric variables
+        MULTIVARIATE_ANALYSIS: Examine multiple variables simultaneously
+        CLUSTER_ANALYSIS: Identify natural groupings in data
+        BUBBLE_RELATIONSHIPS: Show relationships with additional size dimension
+    GEOGRAPHIC_ANALYSIS:
+      description: Visualize data with spatial or location components
+      subtypes:
+        REGIONAL_COMPARISON: Compare values across geographic regions
+        POINT_DISTRIBUTION: Show specific locations on map
+        DENSITY_HEATMAP: Display concentration intensity across areas
+        FLOW_ANALYSIS: Show movement between locations
+    PROCESS_FLOW:
+      description: Analyze stages, sequences, and conversion in processes
+      subtypes:
+        CONVERSION_FUNNEL: Track progression through linear stages
+        SANKEY_FLOW: Show volume transfers between nodes
+        TIMELINE_ANALYSIS: Display events and durations on timeline
+        WORKFLOW_ANALYSIS: Visualize process steps and dependencies
+    PERFORMANCE_MONITORING:
+      description: Track KPIs, metrics, and performance against targets
+      subtypes:
+        KPI_DASHBOARD: Display key metrics and indicators
+        GAUGE_METRICS: Show values within ranges or against targets
+        SCORECARD: Present multiple metrics in tabular format
+        PROGRESS_TRACKING: Monitor progress toward goals
+    ANOMALY_DETECTION:
+      description: Identify outliers, exceptions, and unusual patterns
+      subtypes:
+        OUTLIER_IDENTIFICATION: Highlight statistical outliers
+        THRESHOLD_BREACHES: Show values outside acceptable ranges
+        PATTERN_DEVIATION: Identify deviations from expected patterns
+        QUALITY_CONTROL: Monitor process control limits
+    HIERARCHICAL_ANALYSIS:
+      description: Explore data with parent-child relationships and drill-down paths
+      subtypes:
+        ORG_CHART_VIZ: Display organizational relationships
+        DRLL_DOWN_ANALYSIS: Enable navigation from summary to detail
+        TREE_STRUCTURE: Show nested hierarchical relationships
+        PARENT_CHILD_METRICS: Compare metrics across hierarchy levels
+  visualization_toolset:
+    COMPARE_CATEGORIES:
+      bar_chart:
+        function: px.bar
+        description: Vertical bars for category comparison
+        data_requirements:
+          required_columns:
+            x: categorical
+            y: numerical
+          optional_columns:
+            color: categorical
+            facet_col: categorical
+            facet_row: categorical
+        configuration:
+          barmode:
+          - group
+          - stack
+          - relative
+          orientation: v
+        best_for_subtypes:
+        - RANKING
+        - BENCHMARK_COMPARISON
+      horizontal_bar_chart:
+        function: px.bar
+        description: Horizontal bars for long category names
+        data_requirements:
+          required_columns:
+            y: categorical
+            x: numerical
+        configuration:
+          orientation: h
+        best_for_subtypes:
+        - RANKING
+        - TIME_PERIOD_COMPARISON
+      radar_chart:
+        function: go.Figure(go.Scatterpolar())
+        description: Compare multiple metrics across categories on radial axes
+        data_requirements:
+          required_columns:
+            r: numerical
+            theta: categorical
+            color: categorical
+        best_for_subtypes:
+        - MULTI_METRIC_COMPARISON
+    SHOW_TRENDS:
+      line_chart:
+        function: px.line
+        description: Continuous line showing trend over time
+        data_requirements:
+          required_columns:
+            x: temporal
+            y: numerical
+          optional_columns:
+            color: categorical
+            line_dash: categorical
+        configuration:
+          markers:
+          - true
+          - false
+        best_for_subtypes:
+        - CONTINUOUS_TREND
+        - SEASONAL_PATTERNS
+      area_chart:
+        function: px.area
+        description: Emphasize volume and cumulative trends
+        data_requirements:
+          required_columns:
+            x: temporal
+            y: numerical
+        configuration:
+          groupnorm:
+          - None
+          - fraction
+          - percent
+        best_for_subtypes:
+        - CUMULATIVE_PROGRESS
+        - GROWTH_RATES
+      waterfall_chart:
+        function: go.Figure(go.Waterfall())
+        description: Show sequential cumulative effect of values
+        data_requirements:
+          required_columns:
+            x: categorical
+            y: numerical
+        best_for_subtypes:
+        - GROWTH_RATES
+        - PERFORMANCE_DECOMPOSITION
+    DISTRIBUTION_ANALYSIS:
+      histogram:
+        function: px.histogram
+        description: Frequency distribution of numerical data
+        data_requirements:
+          required_columns:
+            x: numerical
+          optional_columns:
+            color: categorical
+            marginal: categorical
+        configuration:
+          nbins: integer
+          marginal:
+          - box
+          - violin
+          - rug
+        best_for_subtypes:
+        - FREQUENCY_DISTRIBUTION
+      box_plot:
+        function: px.box
+        description: Statistical summary with quartiles and outliers
+        data_requirements:
+          required_columns:
+            x: categorical
+            y: numerical
+        best_for_subtypes:
+        - STATISTICAL_SUMMARY
+        - OUTLIER_IDENTIFICATION
+      violin_plot:
+        function: px.violin
+        description: Combines box plot with kernel density estimation
+        data_requirements:
+          required_columns:
+            x: categorical
+            y: numerical
+        best_for_subtypes:
+        - PROBABILITY_DENSITY
+        - MULTI_VARIABLE_DISTRIBUTION
+      2d_density_contour:
+        function: px.density_contour
+        description: Contour plot showing density of two variables
+        data_requirements:
+          required_columns:
+            x: numerical
+            y: numerical
+        best_for_subtypes:
+        - MULTI_VARIABLE_DISTRIBUTION
+    PART_TO_WHOLE:
+      pie_chart:
+        function: px.pie
+        description: Circular chart showing proportions
+        data_requirements:
+          required_columns:
+            names: categorical
+            values: numerical
+        constraints: Max 6-8 categories recommended
+        best_for_subtypes:
+        - SIMPLE_COMPOSITION
+      treemap:
+        function: px.treemap
+        description: Nested rectangles showing hierarchical composition
+        data_requirements:
+          required_columns:
+            path: list_of_categorical
+            values: numerical
+        best_for_subtypes:
+        - HIERARCHICAL_COMPOSITION
+      sunburst_chart:
+        function: px.sunburst
+        description: Radial hierarchical part-to-whole visualization
+        data_requirements:
+          required_columns:
+            path: list_of_categorical
+            values: numerical
+        best_for_subtypes:
+        - HIERARCHICAL_COMPOSITION
+        - PROGRESSIVE_COMPOSITION
+      stacked_bar_chart:
+        function: px.bar
+        description: Bars segmented into component parts
+        data_requirements:
+          required_columns:
+            x: categorical
+            y: numerical
+            color: categorical
+        configuration:
+          barmode: stack
+        best_for_subtypes:
+        - COMPOSITION_COMPARISON
+        - STACKED_COMPARISON
+    RELATIONSHIP_ANALYSIS:
+      scatter_plot:
+        function: px.scatter
+        description: Relationship between two continuous variables
+        data_requirements:
+          required_columns:
+            x: numerical
+            y: numerical
+          optional_columns:
+            color: categorical
+            size: numerical
+            hover_data: list
+        best_for_subtypes:
+        - CORRELATION_SCATTER
+        - CLUSTER_ANALYSIS
+      bubble_chart:
+        function: px.scatter
+        description: Scatter plot with variable-sized markers
+        data_requirements:
+          required_columns:
+            x: numerical
+            y: numerical
+            size: numerical
+        best_for_subtypes:
+        - BUBBLE_RELATIONSHIPS
+        - MULTIVARIATE_ANALYSIS
+      scatter_matrix:
+        function: px.scatter_matrix
+        description: Matrix of scatter plots for multiple variables
+        data_requirements:
+          required_columns:
+            dimensions: list_of_numerical
+        best_for_subtypes:
+        - MULTIVARIATE_ANALYSIS
+        - CORRELATION_ANALYSIS
+      parallel_coordinates:
+        function: px.parallel_coordinates
+        description: Multivariate analysis with parallel axes
+        data_requirements:
+          required_columns:
+            dimensions: list_of_numerical
+        best_for_subtypes:
+        - MULTIVARIATE_ANALYSIS
+        - CLUSTER_ANALYSIS
+      parallel_categories:
+        function: px.parallel_categories
+        description: Multivariate analysis for categorical data
+        data_requirements:
+          required_columns:
+            dimensions: list_of_categorical
+        best_for_subtypes:
+        - CATEGORICAL_RELATIONSHIPS
+    GEOGRAPHIC_ANALYSIS:
+      choropleth_map:
+        function: px.choropleth
+        description: Thematic map with regions colored by value
+        data_requirements:
+          required_columns:
+            locations: geographic_codes
+            color: numerical
+        best_for_subtypes:
+        - REGIONAL_COMPARISON
+      scatter_map:
+        function: px.scatter_geo
+        description: Points on map with optional size/color encoding
+        data_requirements:
+          required_columns:
+            lat: latitude
+            lon: longitude
+          optional_columns:
+            size: numerical
+            color: categorical
+        best_for_subtypes:
+        - POINT_DISTRIBUTION
+      density_mapbox:
+        function: px.density_mapbox
+        description: Heatmap showing point density on map
+        data_requirements:
+          required_columns:
+            lat: latitude
+            lon: longitude
+        best_for_subtypes:
+        - DENSITY_HEATMAP
+    PROCESS_FLOW:
+      funnel_chart:
+        function: px.funnel
+        description: Stages in linear process with volume reduction
+        data_requirements:
+          required_columns:
+            x: numerical
+            y: categorical
+        best_for_subtypes:
+        - CONVERSION_FUNNEL
+      funnel_area:
+        function: px.funnel_area
+        description: Funnel visualization in area format
+        data_requirements:
+          required_columns:
+            values: numerical
+            names: categorical
+        best_for_subtypes:
+        - CONVERSION_FUNNEL
+      sankey_diagram:
+        function: go.Figure(go.Sankey())
+        description: Flow diagram showing volume transfers between nodes
+        data_requirements:
+          required_columns:
+            source: categorical
+            target: categorical
+            value: numerical
+        best_for_subtypes:
+        - SANKEY_FLOW
+        - WORKFLOW_ANALYSIS
+      timeline_chart:
+        function: px.timeline
+        description: Events and durations on horizontal timeline
+        data_requirements:
+          required_columns:
+            x_start: datetime
+            x_end: datetime
+            y: categorical
+        best_for_subtypes:
+        - TIMELINE_ANALYSIS
+    PERFORMANCE_MONITORING:
+      indicator_gauge:
+        function: go.Figure(go.Indicator())
+        description: Gauge showing value within a range
+        data_requirements:
+          required_columns:
+            value: numerical
+            gauge_limits: min_max_values
+        configuration:
+          mode:
+          - gauge+number
+          - gauge+number+delta
+        best_for_subtypes:
+        - GAUGE_METRICS
+        - KPI_DASHBOARD
+      bullet_chart:
+        function: go.Figure()
+        description: Bar with qualitative ranges and target marker
+        data_requirements:
+          required_columns:
+            value: numerical
+            target: numerical
+            ranges: qualitative_bands
+        best_for_subtypes:
+        - BENCHMARK_COMPARISON
+        - PERFORMANCE_TRACKING
+    ANOMALY_DETECTION:
+      anomaly_scatter:
+        function: px.scatter
+        description: Scatter plot with anomaly highlighting
+        data_requirements:
+          required_columns:
+            x: numerical
+            y: numerical
+            anomaly_flag: boolean
+        best_for_subtypes:
+        - OUTLIER_IDENTIFICATION
+        - THRESHOLD_BREACHES
+      control_chart:
+        function: go.Figure()
+        description: Statistical process control with control limits
+        data_requirements:
+          required_columns:
+            x: temporal
+            y: numerical
+            ucl: numerical
+            lcl: numerical
+        best_for_subtypes:
+        - QUALITY_CONTROL
+        - PATTERN_DEVIATION
+    HIERARCHICAL_ANALYSIS:
+      icicle_chart:
+        function: px.icicle
+        description: Rectangular hierarchical partition diagram
+        data_requirements:
+          required_columns:
+            path: list_of_categorical
+            values: numerical
+        best_for_subtypes:
+        - TREE_STRUCTURE
+        - DRLL_DOWN_ANALYSIS
+  bi_pattern_mapping:
+    sales_comparison_by_region:
+      primary_goal: COMPARE_CATEGORIES
+      subtype: RANKING
+      recommended_charts:
+      - bar_chart
+      - horizontal_bar_chart
+    monthly_revenue_trend:
+      primary_goal: SHOW_TRENDS
+      subtype: CONTINUOUS_TREND
+      recommended_charts:
+      - line_chart
+      - area_chart
+    customer_segmentation:
+      primary_goal: DISTRIBUTION_ANALYSIS
+      subtype: MULTI_VARIABLE_DISTRIBUTION
+      recommended_charts:
+      - scatter_plot
+      - violin_plot
+      - box_plot
+    market_share_analysis:
+      primary_goal: PART_TO_WHOLE
+      subtype: SIMPLE_COMPOSITION
+      recommended_charts:
+      - pie_chart
+      - treemap
+    sales_conversion_funnel:
+      primary_goal: PROCESS_FLOW
+      subtype: CONVERSION_FUNNEL
+      recommended_charts:
+      - funnel_chart
+      - funnel_area
+    regional_performance_map:
+      primary_goal: GEOGRAPHIC_ANALYSIS
+      subtype: REGIONAL_COMPARISON
+      recommended_charts:
+      - choropleth_map
+      - scatter_map
