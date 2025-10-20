@@ -9,7 +9,7 @@ from nexus_llm import LLMInterface
 from ..models.sql_agent.public import SQLResult
 from ..models.vis_agent.public import VisualizationResult
 from ..models.vis_agent.state import VisAgentState
-from ..core.data_analyzer import generate_dataframe_metadata
+from ..core.utils import generate_dataframe_metadata
 from ..core.vis_provider import VisualizationProvider, PlotlyProvider
 from ..workflows.vis_agent.react import ReactWorkflow
 

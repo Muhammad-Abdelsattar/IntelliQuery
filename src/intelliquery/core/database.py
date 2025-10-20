@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 import hashlib
 import logging
 
@@ -11,54 +11,39 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
 
-from .caching import CacheProvider, InMemoryCacheProvider
-
 logger = logging.getLogger(__name__)
 
 
 class DatabaseService(SQLDatabase):
     """
-    A specialized, enhanced database service that inherits from LangChain's SQLDatabase.
-
-    This class provides all the core functionality of SQLDatabase and adds on top:
-    - A caching layer for enriched context.
-    - Safe, portable methods for fetching categorical data.
-    - A "dry-run" query validation method.
-    - A direct-to-DataFrame query execution method.
+    A specialized database service that provides core database interactions.
+    
+    This class handles schema extraction, query execution, and validation.
+    It no longer manages caching, which is now handled by the DBContextAnalyzer.
     """
 
     CARDINALITY_LIMIT = 25
 
+    # --- MODIFICATION: Simplified __init__ ---
     def __init__(
         self,
         engine: Engine,
-        cache_provider: Optional[CacheProvider] = None,
         **kwargs: Any,
     ):
         """
-        Initializes the service. It accepts all arguments that the underlying
-        langchain_community.utilities.SQLDatabase accepts.
+        Initializes the service.
 
         Args:
             engine: The SQLAlchemy engine to connect to the database.
-            cache_provider: An optional caching provider for context.
             **kwargs: All other arguments are passed directly to the SQLDatabase parent class.
-                      (e.g., schema, include_tables, sample_rows_in_table_info, etc.)
         """
-        # Pass all the standard SQLDatabase arguments to the parent constructor
         super().__init__(engine=engine, **kwargs)
-
-        # Initialize our custom additions
-        self.cache = (
-            cache_provider if cache_provider is not None else InMemoryCacheProvider()
-        )
-        self._metadata = (
-            MetaData()
-        )  # We still need our own metadata object for reflection
+        # The cache provider is no longer part of this service.
+        self._metadata = MetaData()
 
     def get_raw_schema_and_key(self) -> Tuple[str, str]:
         """
-        Gets the raw schema DDL and computes a stable SHA256 hash to use as a cache key.
+        Gets the raw schema DDL and computes a stable SHA256 hash to use as a key.
         """
         raw_schema = self.get_table_info()
         schema_key = hashlib.sha256(raw_schema.encode()).hexdigest()
@@ -68,8 +53,7 @@ class DatabaseService(SQLDatabase):
         self, tables_and_columns: List[Dict[str, str]]
     ) -> Dict[str, List[Any]]:
         """
-        Safely and portably fetches distinct values for a list of columns
-        using SQLAlchemy's Expression Language.
+        Safely and portably fetches distinct values for a list of columns.
         """
         distinct_values = {}
         limit = self.CARDINALITY_LIMIT + 1
