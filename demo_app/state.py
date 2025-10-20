@@ -52,6 +52,8 @@ class AppState:
         # A flag to indicate if the services have been initialized for the current connection
         self.services_initialized: bool = False
 
+        self.workflow_type: str = "Simple"
+
         # --- LLM Management ---
         # The full configuration for all available LLM providers
         self.all_llm_providers: Optional[Dict] = None

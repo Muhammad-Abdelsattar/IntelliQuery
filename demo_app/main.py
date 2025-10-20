@@ -1,20 +1,8 @@
-"""
-Main Streamlit application file for the IntelliQuery demo.
-
-This file orchestrates the entire user interface, manages application state,
-and integrates the various services (chat, database, LLM) to provide
-the interactive text-to-SQL experience.
-
-The application is structured as a single-page app with different "pages"
-rendered based on the application's state.
-"""
-
-# --- Core Imports ---
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+import sqlparse
 
-# --- Library Imports ---
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -22,8 +10,6 @@ from nexus_llm import load_settings
 from sqlalchemy import create_engine
 import plotly.express as px
 
-
-# --- Internal Imports ---
 from intelliquery import (
     DBContextAnalyzer,
     DatabaseService,
@@ -34,11 +20,11 @@ from intelliquery import (
     VisualizationAgent,
 )
 from intelliquery.workflows.sql_agent.simple import SimpleWorkflow
+from intelliquery.workflows.sql_agent.reflection import ReflectionWorkflow
 from services import chat_service, connection_service, llm_service
 from state import AppState, get_state
 from ui_components import chat_renderer, sidebar
 
-# --- Initial Setup ---
 load_dotenv()
 
 st.set_page_config(
@@ -46,11 +32,6 @@ st.set_page_config(
     page_icon="🧠",
     layout="wide",
 )
-
-
-# -----------------------------------------------------------------------------
-# Page Rendering Functions
-# -----------------------------------------------------------------------------
 
 
 def render_home_page():
@@ -83,13 +64,11 @@ def render_connection_manager_page():
         "Manage your database connections here. The enriched context for each connection will be cached for faster performance."
     )
 
-    # Initialize confirmation state for deletions
     if "confirming_delete_index" not in st.session_state:
         st.session_state.confirming_delete_index = None
 
     col1, col2 = st.columns([1, 1.5])
 
-    # --- Column 1: Existing Connections ---
     with col1:
         st.subheader("Existing Connections")
         if not state.connections:
@@ -110,7 +89,6 @@ def render_connection_manager_page():
                         "URL", value=conn["url"], disabled=True, key=f"url_{i}"
                     )
 
-                    # --- Deletion Logic ---
                     if st.session_state.confirming_delete_index == i:
                         st.warning(
                             f"Are you sure you want to delete **{conn['name']}**?"
@@ -132,43 +110,25 @@ def render_connection_manager_page():
                         if c2.button("Delete", key=f"delete_{i}", type="primary"):
                             st.session_state.confirming_delete_index = i
                             st.rerun()
-
-    # --- Column 2: Add/Edit Connection Form ---
     with col2:
         is_editing = state.selected_connection is not None
         form_title = "Edit Connection" if is_editing else "Add New Connection"
         st.subheader(form_title)
-
         with st.form(key="connection_form", clear_on_submit=False):
             default_conn = state.selected_connection or {}
-            name = st.text_input(
-                "Connection Name*",
-                value=default_conn.get("name", ""),
-                help="A unique, friendly name for this connection.",
-            )
-            url = st.text_input(
-                "Database URL*",
-                value=default_conn.get("url", ""),
-                help="SQLAlchemy connection string. Use ${SECRET_NAME} for secrets.",
-            )
-            schema = st.text_input(
-                "Schema",
-                value=default_conn.get("schema", ""),
-                help="The schema to use. Leave blank for default.",
-            )
+            name = st.text_input("Connection Name*", value=default_conn.get("name", ""))
+            url = st.text_input("Database URL*", value=default_conn.get("url", ""))
+            schema = st.text_input("Schema", value=default_conn.get("schema", ""))
             tables = st.text_input(
                 "Include Tables (Optional)",
                 value=",".join(default_conn.get("tables", [])),
-                help="Comma-separated list of tables. Leave blank for all.",
             )
             business_context = st.text_area(
                 "Default Business Context (Optional)",
                 value=default_conn.get("business_context", ""),
                 height=150,
             )
-
             submitted = st.form_submit_button("Save & Analyze Connection")
-
             if submitted:
                 if not all([name, url]):
                     st.error("Connection Name and URL are required.")
@@ -183,7 +143,6 @@ def render_connection_manager_page():
                         is_editing,
                         default_conn.get("name"),
                     )
-
         if is_editing:
             if st.button("Cancel Edit"):
                 state.selected_connection = None
@@ -212,11 +171,6 @@ def render_chat_page():
     # Handle new user input
     if prompt := st.chat_input("Ask a question about your data..."):
         handle_user_prompt(state, prompt)
-
-
-# -----------------------------------------------------------------------------
-# Service Initialization and Handling
-# -----------------------------------------------------------------------------
 
 
 def initialize_chat_services(state: AppState):
@@ -249,11 +203,13 @@ def initialize_chat_services(state: AppState):
             business_context=state.business_context
         )
 
-        sql_workflow = SimpleWorkflow(llm_interface, db_service)
-        sql_agent = SQLAgent(
-            db_service=db_service,
-            workflow=sql_workflow,
-        )
+        # Allow workflow selection from UI
+        if state.workflow_type == "Reflection":
+            sql_workflow = ReflectionWorkflow(llm_interface, db_service)
+        else:
+            sql_workflow = SimpleWorkflow(llm_interface, db_service)
+
+        sql_agent = SQLAgent(db_service=db_service, workflow=sql_workflow)
         vis_agent = VisualizationAgent(llm_interface=llm_interface)
 
         orchestrator = BIOrchestrator(
@@ -309,7 +265,6 @@ def handle_connection_form_submission(
                 "tables": table_list,
                 "business_context": business_context,
             }
-
             if is_editing:
                 for i, c in enumerate(state.connections):
                     if c["name"] == original_name:
@@ -317,52 +272,60 @@ def handle_connection_form_submission(
                         break
             else:
                 state.connections.append(new_conn)
-
             state.save_and_reload_connections()
             state.selected_connection = None
-
         st.success(f"Connection '{name}' saved and analyzed successfully!")
         st.rerun()
-
     except Exception as e:
         st.error(f"An error occurred: {e}")
         with st.expander("View Full Error Traceback"):
             st.exception(e)
 
 
-# -----------------------------------------------------------------------------
-# Chat and Agent Interaction
-# -----------------------------------------------------------------------------
-
-
 def handle_user_prompt(state: AppState, prompt: str):
     """
-    Handles the logic for processing a user's chat input, running the agent,
-    and displaying the results.
+    Handles user input with a seamless, in-place message update for progress.
     """
+    # 1. Add and render the user's message.
     user_message = {"role": "user", "content": prompt, "timestamp": time.time()}
     state.chat_history.append(user_message)
     chat_renderer.render_message(user_message, handle_regeneration)
 
     conversation_history = chat_service.get_conversation_history(state.chat_history)
 
+    # 2. Create the assistant's chat bubble and an empty placeholder inside it.
     with st.chat_message("assistant"):
-        with st.status("Agent is thinking...", expanded=True) as status:
-            status.write("Analyzing request and planning execution...")
-            time.sleep(1)
+        placeholder = st.empty()
 
-            result = state.bi_orchestrator.run(
-                question=prompt,
-                context=state.enriched_context,
-                chat_history=conversation_history,
-            )
+        # 3. Stream progress updates directly into the placeholder.
+        placeholder.markdown("🧠 Analyzing request...")
+        time.sleep(0.5)
 
-            assistant_response = process_agent_result(result, status)
-            assistant_response["timestamp"] = time.time()
+        result = state.bi_orchestrator.run(
+            question=prompt,
+            context=state.enriched_context,
+            chat_history=conversation_history,
+        )
 
-    chat_renderer.render_message(assistant_response, handle_regeneration)
+        # Update the placeholder with the final steps.
+        if result.status == "success":
+            if result.visualization_params:
+                placeholder.markdown("🎨 Creating visualization...")
+            elif result.sql_query:
+                placeholder.markdown("🔍 Executing query...")
+            time.sleep(1)  # A brief moment to see the final step
+
+        # 4. Prepare the final message dictionary.
+        assistant_response = process_agent_result(result)
+        assistant_response["timestamp"] = time.time()
+
+        # 5. Clear the placeholder and render the final, rich message in its place.
+        placeholder.empty()
+        with placeholder.container():
+            chat_renderer.render_message(assistant_response, handle_regeneration)
+
+    # 6. Add the final message to history and save.
     state.chat_history.append(assistant_response)
-
     chat_service.save_chat_history(
         state.current_chat_id,
         state.selected_connection["name"],
@@ -370,28 +333,26 @@ def handle_user_prompt(state: AppState, prompt: str):
     )
 
 
-def process_agent_result(result: BIResult, status) -> Dict[str, Any]:
+def process_agent_result(result: BIResult) -> Dict[str, Any]:
     """
-    Processes the result from the BIOrchestrator and returns a message
-    dictionary suitable for rendering.
+    Processes the final result from the BIOrchestrator and returns a message
+    dictionary suitable for rendering. No longer interacts with the status UI.
     """
     if result.status == "clarification_needed":
-        status.update(label="Agent needs more information.", state="complete")
         return {
             "role": "assistant",
             "content_type": "text",
             "content": result.final_answer,
         }
+
     elif result.status == "error":
-        status.update(label="An error occurred.", state="error")
         return {
             "role": "assistant",
             "content_type": "error",
             "content": result.error_message,
         }
+
     elif result.status == "success":
-        status.update(label="Request processed successfully!", state="complete")
-        # If the successful result has no data or viz, treat it as a simple text response
         if result.dataframe is None and result.visualization is None:
             return {
                 "role": "assistant",
@@ -399,10 +360,16 @@ def process_agent_result(result: BIResult, status) -> Dict[str, Any]:
                 "content": result.final_answer,
             }
 
-        # Otherwise, it's a full BI result
+        # For live generations, we still need to eager load the results into the cache.
+        message_key = f"result_{time.time()}"
+        df, fig = handle_regeneration(result.model_dump())
+        st.session_state.results_cache[message_key] = (df, fig)
+
         return {
             "role": "assistant",
             "content_type": "bi_result",
+            "message_key": message_key,
+            "is_live_generation": True,
             "data": {
                 "final_answer": result.final_answer,
                 "sql_query": result.sql_query,
@@ -410,8 +377,8 @@ def process_agent_result(result: BIResult, status) -> Dict[str, Any]:
                 "visualization_params": result.visualization_params,
             },
         }
-    else:  # Fallback for unknown status
-        status.update(label="An unknown error occurred.", state="error")
+
+    else:  # Fallback
         return {
             "role": "assistant",
             "content_type": "error",
@@ -425,7 +392,6 @@ def handle_regeneration(
     """
     Callback function to deterministically regenerate results (data + viz)
     from saved parameters in the chat history.
-    Returns the dataframe and the figure object.
     """
     state = get_state()
     if not state.db_service:
@@ -436,39 +402,30 @@ def handle_regeneration(
     vis_params = message_data.get("visualization_params")
 
     if not sql_query:
-        st.warning("No SQL query found to regenerate results.")
+        # This can happen if the agent's final answer doesn't involve a query
         return None, None
 
     try:
         df = state.db_service.execute_for_dataframe(sql_query)
         fig = None
 
-        if vis_params and not df.empty:
-            tool_name = next(iter(vis_params))
-            args_copy = vis_params[tool_name]["arguments"].copy()
-            args_copy["data_frame"] = df  # Inject the fresh dataframe
+        if vis_params and df is not None and not df.empty:
+            tool_name, tool_args = next(iter(vis_params.items()))
+            args_copy = tool_args["arguments"].copy()
 
-            vis_func_name = tool_name.replace("_chart", "")
-
-            if hasattr(px, vis_func_name):
-                vis_func = getattr(px, vis_func_name)
-                fig = vis_func(**args_copy)
-                fig.update_layout(template="plotly_white")
+            vis_provider = VisualizationAgent(
+                llm_interface=llm_service.get_llm_interface(state)
+            ).provider
+            if vis_provider:
+                fig = vis_provider.create_chart(tool_name, df, **args_copy)
             else:
-                st.error(
-                    f"Visualization function '{vis_func_name}' not found in Plotly Express."
-                )
+                st.error("Visualization provider not available.")
 
         return df, fig
 
     except Exception as e:
         st.error(f"Failed to regenerate results: {e}")
         return None, None
-
-
-# -----------------------------------------------------------------------------
-# Main Application Logic
-# -----------------------------------------------------------------------------
 
 
 def main():
