@@ -34,12 +34,26 @@ class IntelliQuery:
         context_analyzer: DBContextAnalyzer,
         orchestrators: Dict[str, BIOrchestrator],
         default_llm_key: str,
+        db_service: DatabaseService,
+        visualization_provider: VisualizationProvider,
     ):
         self._context_analyzer = context_analyzer
         self._orchestrators = orchestrators
         self._default_llm_key = default_llm_key
         self._enriched_context: Optional[EnrichedDatabaseContext] = None
+        self._db_service = db_service
+        self._vis_provider = visualization_provider
         self._last_business_context: Optional[str] = None
+
+    @property
+    def db_service(self) -> DatabaseService:
+        """Provides access to the configured DatabaseService instance."""
+        return self._db_service
+
+    @property
+    def vis_provider(self) -> VisualizationProvider:
+        """Provides access to the configured VisualizationProvider instance."""
+        return self._vis_provider
 
     def _get_or_build_context(
         self, business_context: Optional[str] = None
@@ -100,7 +114,7 @@ class IntelliQuery:
 
 def create_intelliquery_system(
     database_engine: Engine,
-    llm_settings: Dict[str, Any],
+    llm_settings: Dict[str, Any] | str,
     sql_workflow_type: Literal["simple", "reflection"] = "reflection",
     context_llm_key: Optional[str] = None,
     default_agent_llm_key: Optional[str] = None,
@@ -114,7 +128,7 @@ def create_intelliquery_system(
 
     Args:
         database_engine: An initialized SQLAlchemy Engine.
-        llm_settings: Configuration dictionary for nexus-llm.
+        llm_settings: Configuration dictionary for nexus-llm or the path to the providers file.
         sql_workflow_type: The workflow for the SQL agent ('reflection' or 'simple').
         context_llm_key: (Optional) The key of a specific LLM to use for the
                          one-time database context analysis. If None, uses the
@@ -176,4 +190,6 @@ def create_intelliquery_system(
         context_analyzer=context_analyzer,
         orchestrators=orchestrators,
         default_llm_key=default_key,
+        db_service=db_service,
+        visualization_provider=vis,
     )

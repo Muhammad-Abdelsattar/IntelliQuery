@@ -13,8 +13,12 @@ from .models.sql_agent.public import SQLPlan, SQLResult, EnrichedDatabaseContext
 from .models.bi_agent.public import BIResult
 from .models.vis_agent.public import VisualizationResult
 
+from .facade import create_intelliquery_system, IntelliQuery
+
 
 __all__ = [
+    "create_intelliquery_system",
+    "IntelliQuery",
     "SQLAgent",
     "BIOrchestrator",
     "VisualizationAgent",

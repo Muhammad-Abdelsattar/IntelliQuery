@@ -1,90 +1,92 @@
 import streamlit as st
-import pandas as pd
-from typing import Dict, Any, Callable, Optional, Tuple
+from typing import Dict, Any, Callable
 import sqlparse
 
 
-def render_message(
-    message: Dict[str, Any],
-    regenerate_func: Callable[
-        [Dict[str, Any]], Tuple[Optional[pd.DataFrame], Optional[Any]]
-    ],
-):
-    """
-    Renders a single chat message based on its content and type, with new logic
-    for eager display of live results vs. button for historical results.
-    """
+def render_message(message: Dict[str, Any], regenerate_func: Callable):
+    """Renders a single chat message."""
     role = message.get("role")
-
-    # Use the unique message key if it exists, otherwise fallback to timestamp
-    message_key = message.get("message_key", f"regen_{message.get('timestamp', 0)}")
-
-    if "results_cache" not in st.session_state:
-        st.session_state.results_cache = {}
-
     with st.chat_message(role):
         content_type = message.get("content_type", "text")
 
         if role == "user":
             st.markdown(message.get("content"))
-            return
-
-        if content_type in ["text", "error"]:
+        elif content_type == "text":
             st.markdown(message.get("content"))
-            return
+        elif content_type == "error":
+            st.error(message.get("content"))
+        elif content_type == "bi_result":
+            render_bi_result(message, regenerate_func)
 
-        if content_type == "bi_result":
-            data = message.get("data", {})
-            final_answer = data.get("final_answer", "No answer provided.")
-            sql_query = data.get("sql_query", "No SQL available.")
-            reasoning = data.get("reasoning", "No reasoning provided.")
 
-            is_live_generation = message.get("is_live_generation", False)
-            results_are_visible = message_key in st.session_state.results_cache
+def render_bi_result(message: Dict[str, Any], regenerate_func: Callable):
+    """Renders the BI result with a default-expanded container for data."""
+    message_data = message.get("data", {})
+    answer = message_data.get("answer", "No answer provided.")
+    sql_query = message_data.get("sql_query")
+    reasoning = message_data.get("reasoning")
+    vis_params = message_data.get("visualization_params")
+    timestamp = message.get("timestamp")
 
-            st.markdown(final_answer)
+    # Check for live data (from the initial turn) vs. refreshed data (from state)
+    live_dataframe = message_data.get("dataframe")
+    live_visualization = message_data.get("visualization")
+    refreshed_results = st.session_state.get("refreshed_results", {}).get(timestamp)
 
-            button_label = (
-                "🔄 Refresh Data"
-                if results_are_visible
-                else "▶️ Run Query & View Results"
+    st.markdown(answer)
+
+    if sql_query:
+        with st.expander("Show Details"):
+            st.markdown("**Generated SQL Query:**")
+            st.code(
+                sqlparse.format(sql_query, reindent=True, keyword_case="upper"),
+                language="sql",
             )
-            if st.button(button_label, key=message_key):
-                with st.spinner("Executing query and regenerating results..."):
-                    df, fig = regenerate_func(data)
-                    st.session_state.results_cache[message_key] = (df, fig)
-                st.rerun()
-
-            if is_live_generation or results_are_visible:
-                if message_key in st.session_state.results_cache:
-                    df, fig = st.session_state.results_cache[message_key]
-
-                    if df is not None and not df.empty:
-                        with st.expander("View Data", expanded=True):
-                            st.dataframe(df, use_container_width=True)
-                            st.download_button(
-                                "Download CSV",
-                                df.to_csv(index=False).encode("utf-8"),
-                                f"data_{message_key}.csv",
-                                "text/csv",
-                            )
-                    elif df is not None:
-                        with st.expander("View Data", expanded=True):
-                            st.info(
-                                "The query executed successfully but returned no data."
-                            )
-
-                    if fig is not None:
-                        with st.expander("View Visualization", expanded=True):
-                            st.plotly_chart(fig, use_container_width=True)
-
-            # Details are always available in an expander
-            with st.expander("Show Details"):
+            if reasoning:
                 st.markdown("**Agent's Reasoning:**")
-                st.markdown(reasoning or "_No reasoning provided._")
-                st.markdown("**Generated SQL Query:**")
-                st.code(
-                    sqlparse.format(sql_query, reindent=True, keyword_case="upper"),
-                    language="sql",
-                )
+                st.markdown(reasoning)
 
+        button_label = (
+            "🔄 Refresh Data"
+            if live_dataframe is not None or refreshed_results
+            else "▶️ Run Query"
+        )
+        st.button(
+            button_label,
+            key=f"run_{timestamp}",
+            on_click=regenerate_func,
+            args=(timestamp, sql_query, vis_params),
+        )
+
+    visualization_to_show = (
+        refreshed_results["visualization"] if refreshed_results else live_visualization
+    )
+    dataframe_to_show = (
+        refreshed_results["dataframe"] if refreshed_results else live_dataframe
+    )
+
+    # Determine if the expander should be open by default
+    has_results_to_show = (
+        dataframe_to_show is not None or visualization_to_show is not None
+    )
+    is_expanded_by_default = has_results_to_show and (
+        live_dataframe is not None or refreshed_results is not None
+    )
+
+    if has_results_to_show:
+        with st.expander("View Results", expanded=is_expanded_by_default):
+            if visualization_to_show:
+                st.plotly_chart(visualization_to_show, use_container_width=True)
+
+            if dataframe_to_show is not None:
+                st.dataframe(dataframe_to_show, use_container_width=True)
+                if dataframe_to_show.empty:
+                    st.info("The query executed successfully but returned no results.")
+                else:
+                    st.download_button(
+                        label="Download as CSV",
+                        data=dataframe_to_show.to_csv(index=False).encode("utf-8"),
+                        file_name="query_results.csv",
+                        mime="text/csv",
+                        key=f"download_{timestamp}",
+                    )

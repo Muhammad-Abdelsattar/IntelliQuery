@@ -144,65 +144,65 @@ class DBContextAnalyzer:
         return "\n".join(augmented_lines)
 
 
-def build_context(
-    self, business_context: Optional[str] = None
-) -> EnrichedDatabaseContext:
-    """
-    Main orchestration method for the context enrichment.
-    If no LLM is provided, it returns a basic context with only the raw schema.
-    """
-    raw_schema, schema_key = self.db_service.get_raw_schema_and_key()
+    def build_context(
+        self, business_context: Optional[str] = None
+    ) -> EnrichedDatabaseContext:
+        """
+        Main orchestration method for the context enrichment.
+        If no LLM is provided, it returns a basic context with only the raw schema.
+        """
+        raw_schema, schema_key = self.db_service.get_raw_schema_and_key()
 
-    if not self.llm_interface:
-        logger.warning("No LLM interface provided. Falling back to raw schema context.")
-        return EnrichedDatabaseContext(
+        if not self.llm_interface:
+            logger.warning("No LLM interface provided. Falling back to raw schema context.")
+            return EnrichedDatabaseContext(
+                raw_schema=raw_schema,
+                augmented_schema=raw_schema,  # Augmented is same as raw
+                schema_key=schema_key,
+                business_context=business_context,
+            )
+
+        full_key = f"{schema_key}-{hash(business_context)}"
+
+        # Check the cache (using the injected cache_provider)
+        cached_context_str = self.cache_provider.get(full_key)
+        if cached_context_str:
+            logger.info(f"CACHE HIT for context key: {full_key[:10]}...")
+            return EnrichedDatabaseContext(**json.loads(cached_context_str))
+
+        logger.info(f"CACHE MISS for key: {full_key[:10]}... Building new context.")
+
+        analyzer_prompt = self.prompt_provider.get_template(
+            os.path.join("sql_agent", "schema_analyzer.prompt")
+        )
+        try:
+            plan = self.llm_interface.generate_structured(
+                system_prompt=analyzer_prompt,
+                user_input=f"Analyze this schema: {raw_schema}",
+                variables={"schema_ddl": raw_schema},
+                response_model=InspectionPlan,
+            )
+
+            columns_to_check = [item.model_dump() for item in plan.columns_to_inspect]
+        except Exception as e:
+            # raise e
+            logger.error(f"Failed to generate a valid inspection plan: {e}")
+            columns_to_check = []
+
+        # Fetch the distinct values
+        fetched_values = self.db_service.fetch_distinct_values(columns_to_check)
+
+        augmented_schema = self._synthesize_augmented_schema(raw_schema, fetched_values)
+
+        context = EnrichedDatabaseContext(
             raw_schema=raw_schema,
-            augmented_schema=raw_schema,  # Augmented is same as raw
+            augmented_schema=augmented_schema,
             schema_key=schema_key,
             business_context=business_context,
         )
 
-    full_key = f"{schema_key}-{hash(business_context)}"
+        # Save to cache
+        self.cache_provider.set(full_key, context.model_dump_json())
+        logger.info(f"Saved new context to cache for key: {full_key[:10]}...")
 
-    # Check the cache (using the injected cache_provider)
-    cached_context_str = self.cache_provider.get(full_key)
-    if cached_context_str:
-        logger.info(f"CACHE HIT for context key: {full_key[:10]}...")
-        return EnrichedDatabaseContext(**json.loads(cached_context_str))
-
-    logger.info(f"CACHE MISS for key: {full_key[:10]}... Building new context.")
-
-    analyzer_prompt = self.prompt_provider.get_template(
-        os.path.join("sql_agent", "schema_analyzer.prompt")
-    )
-    try:
-        plan = self.llm_interface.generate_structured(
-            system_prompt=analyzer_prompt,
-            user_input=f"Analyze this schema: {raw_schema}",
-            variables={"schema_ddl": raw_schema},
-            response_model=InspectionPlan,
-        )
-
-        columns_to_check = [item.model_dump() for item in plan.columns_to_inspect]
-    except Exception as e:
-        # raise e
-        logger.error(f"Failed to generate a valid inspection plan: {e}")
-        columns_to_check = []
-
-    # Fetch the distinct values
-    fetched_values = self.db_service.fetch_distinct_values(columns_to_check)
-
-    augmented_schema = self._synthesize_augmented_schema(raw_schema, fetched_values)
-
-    context = EnrichedDatabaseContext(
-        raw_schema=raw_schema,
-        augmented_schema=augmented_schema,
-        schema_key=schema_key,
-        business_context=business_context,
-    )
-
-    # Save to cache
-    self.cache_provider.set(full_key, context.model_dump_json())
-    logger.info(f"Saved new context to cache for key: {full_key[:10]}...")
-
-    return context
+        return context

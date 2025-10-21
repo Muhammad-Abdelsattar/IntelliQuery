@@ -17,14 +17,13 @@ logger = logging.getLogger(__name__)
 class DatabaseService(SQLDatabase):
     """
     A specialized database service that provides core database interactions.
-    
+
     This class handles schema extraction, query execution, and validation.
     It no longer manages caching, which is now handled by the DBContextAnalyzer.
     """
 
     CARDINALITY_LIMIT = 25
 
-    # --- MODIFICATION: Simplified __init__ ---
     def __init__(
         self,
         engine: Engine,

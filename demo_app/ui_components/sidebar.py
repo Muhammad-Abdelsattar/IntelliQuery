@@ -1,37 +1,18 @@
-"""
-UI component for the main sidebar of the Streamlit application.
-
-This module is responsible for building the primary navigation and control center
-of the application. The sidebar allows users to:
-- Navigate between the main pages (Home, Manage Connections).
-- Select the active database connection.
-- Start new chat sessions.
-- Load past chat sessions.
-- Control session-specific settings like the AI model, workflow, and execution mode.
-
-All actions taken in the sidebar modify the central `AppState` object, making it
-the single source of truth for the application's state.
-"""
-
 import streamlit as st
-from state import AppState, get_state
+from state import get_state
 from services import chat_service
 
 
 def build_sidebar():
     """
-    Builds the main sidebar, which acts as the primary navigation and
-    control panel for the application.
+    Builds the main sidebar, driving the state of the single-page app.
     """
     state = get_state()
 
     with st.sidebar:
         st.header("IntelliQuery")
-        st.markdown("Your AI Database & BI Assistant")
+        st.markdown("Your AI Database Assistant")
 
-        # --- Page Navigation ---
-        # These buttons update the `page` attribute in the app state, which the
-        # main app file uses for routing.
         if st.button("🏠 Home", use_container_width=True):
             state.set_page("home")
             st.rerun()
@@ -41,19 +22,16 @@ def build_sidebar():
 
         st.divider()
 
-        # --- Database Connection Selection ---
         st.subheader("Database Connection")
         connections = state.connections
         connection_options = {conn["name"]: conn for conn in connections}
 
-        # --- Connection Change Confirmation Logic ---
-        # This prevents accidental loss of an active chat session.
         if "pending_connection_change" not in st.session_state:
             st.session_state.pending_connection_change = None
 
         if st.session_state.pending_connection_change:
             st.warning(
-                "Changing connections will start a new chat session. Your current chat will be lost. Proceed?"
+                "Changing connections will start a new chat session. Proceed?"
             )
             c1, c2 = st.columns(2)
             if c1.button("✅ Proceed", use_container_width=True):
@@ -82,8 +60,6 @@ def build_sidebar():
         )
 
         if selected_name and selected_name != current_conn_name:
-            # If a chat is already active, ask for confirmation before switching.
-            # Otherwise, switch the connection directly.
             if state.chat_history:
                 st.session_state.pending_connection_change = selected_name
                 st.rerun()
@@ -94,7 +70,6 @@ def build_sidebar():
 
         st.divider()
 
-        # --- Chat History Management ---
         st.subheader("Chat History")
         if st.button("➕ New Chat", use_container_width=True):
             if not state.selected_connection:
@@ -113,8 +88,7 @@ def build_sidebar():
                     session["name"], key=session["id"], use_container_width=True
                 ):
                     conn_name, history = chat_service.load_chat_history(session["id"])
-                    # When loading a chat, we also need to switch to its associated connection.
-                    if state.select_connection(conn_name):
+                    if conn_name and state.select_connection(conn_name):
                         state.chat_history = history
                         state.current_chat_id = session["id"]
                         state.set_page("chat")
@@ -124,12 +98,52 @@ def build_sidebar():
                             f"Connection '{conn_name}' for this chat could not be found."
                         )
 
-            # --- Business Context Override ---
-            with st.expander("**Current Chat's Business Context**", expanded=False):
-                st.info(
-                    "Define business rules, acronyms, or jargon for this session only.",
-                    icon="ℹ️",
+        if state.page == "chat":
+            st.divider()
+            st.subheader("Session Controls")
+
+            st.markdown("**AI Model**")
+            if state.all_llm_providers:
+                provider_keys = list(state.all_llm_providers.llm_providers.keys())
+                current_provider = state.selected_llm_provider or (provider_keys[0] if provider_keys else None)
+
+                selected_provider_key = st.selectbox(
+                    "Select the AI model for this session:",
+                    options=provider_keys,
+                    index=(
+                        provider_keys.index(current_provider)
+                        if current_provider in provider_keys
+                        else 0
+                    ),
+                    label_visibility="collapsed",
                 )
+
+                if selected_provider_key != state.selected_llm_provider:
+                    state.selected_llm_provider = selected_provider_key
+                    state.services_initialized = False # Force re-init
+                    st.rerun()
+
+            st.markdown("**Agent Workflow**")
+            workflow_options = {"Simple": "simple", "Reflection": "reflection"}
+            current_workflow_label = [k for k, v in workflow_options.items() if v == state.workflow_mode][0]
+            
+            selected_workflow_label = st.radio(
+                "Workflow",
+                options=list(workflow_options.keys()),
+                index=list(workflow_options.keys()).index(current_workflow_label),
+                horizontal=True,
+                help="**Simple**: A single AI agent generates the query. **Reflection**: A second AI agent reviews and refines the query for accuracy."
+            )
+            
+            selected_workflow = workflow_options[selected_workflow_label]
+            if selected_workflow != state.workflow_mode:
+                state.workflow_mode = selected_workflow
+                state.services_initialized = False # Force re-init
+                st.rerun()
+
+
+            with st.expander("**Current Chat's Business Context**", expanded=False):
+                st.info("Define business rules for this session only.", icon="ℹ️")
                 default_context = (
                     state.selected_connection.get("business_context", "")
                     if state.selected_connection
@@ -141,4 +155,3 @@ def build_sidebar():
                     height=200,
                     label_visibility="collapsed",
                 )
-
