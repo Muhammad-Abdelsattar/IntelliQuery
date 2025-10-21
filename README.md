@@ -1,31 +1,38 @@
-# IntelliQuery: The Agentic SQL Toolkit
+# IntelliQuery: The Agentic BI & Visualization Toolkit
 
-**Turn natural language questions into high-quality, executable SQL queries with a powerful, context-aware AI agent.**
+**Go from natural language questions to data, insights, and visualizations with a powerful, context-aware AI agent.**
 
-IntelliQuery is a Python toolkit designed to **democratize data access**.
-It bridges the gap between complex databases and non-technical users by providing an intelligent orchestration layer that can understand questions, analyze database schemas, and generate accurate SQL.
+IntelliQuery is a Python toolkit designed to **democratize data access**. It provides a complete, agentic Business Intelligence (BI) system that understands user questions, orchestrates complex data retrieval, synthesizes insights, and generates interactive visualizations.
+
+---
+
+🚀 **Want to see it in action?** Check out our interactive [Streamlit Demo Application](./demo_app/README.md) to try IntelliQuery with your own database right in your browser.
 
 ---
 
 ## What is IntelliQuery?
 
-Accessing data from databases often requires specialized knowledge of SQL and a deep understanding of the underlying schema. This creates a bottleneck, limiting data access to a small group of technical experts.
+IntelliQuery is not just a text-to-SQL tool; it's an **automated data analyst**. It uses a sophisticated orchestration agent that manages a team of specialized sub-agents to handle the entire lifecycle of a data query:
 
-IntelliQuery solves this problem by providing a smart, agent-based system. It uses Large Language Models (LLMs) not just to translate text-to-SQL, but to first build a deep, rich understanding of your database's context. It then uses this context to power an orchestrator that can generate, review, and execute queries, effectively acting as an automated data analyst.
+1.  **Understanding Intent**: The main BI agent parses the user's question, understands the core intent (whether it's asking for a number, a list, or a chart), and maintains conversational context.
+2.  **Enriching Context**: It intelligently analyzes your database schema to understand not just tables and columns, but the actual data within them, leading to far more accurate queries.
+3.  **Generating SQL**: It delegates the task of writing SQL to a specialized agent, which can operate in a fast, direct mode or a more robust "reflection" mode where a second AI reviews the query for quality and performance.
+4.  **Executing & Analyzing**: It runs the query and analyzes the resulting data.
+5.  **Generating Visualizations**: If requested, it passes the data to a visualization agent that chooses and creates the most effective chart to represent the information.
+6.  **Synthesizing Answers**: Finally, the main BI agent provides a complete, natural language answer summarizing the findings, along with the underlying data and visualizations.
 
 ## Key Features
 
-- **Automated, Deep Context Awareness**: IntelliQuery doesn't just look at table and column names. It connects directly to your database, analyzes the schema, and intelligently identifies categorical columns (like `status`, `type`, or `category`). It then fetches the distinct values from these columns to enrich the context, allowing the AI to generate queries with correct `WHERE` clauses (e.g., `WHERE status IN ('shipped', 'delivered')`).
-- **Dual Workflow Architecture**: Choose the right tool for the job.
-    - **Simple Workflow**: A fast, direct path from question to SQL. Ideal for simpler queries and rapid development.
-    - **Reflection Workflow**: A more robust, multi-step process where a "reviewer" AI agent examines the generated SQL for correctness, efficiency, and alignment with the user's intent. It provides feedback for self-correction, resulting in higher-quality, more performant queries.
-- **Conversational Memory**: The orchestrator maintains a chat history, allowing users to ask follow-up questions (e.g., "Of those, which ones were sold last month?") and get contextually aware answers.
-- **Modular and Extensible**: The core logic is cleanly separated into `core` components (database, analysis), `models` (data structures), and `workflows` (agent logic). This makes the system easy to understand, maintain, and extend with new capabilities.
-- **Database Agnostic**: Built on top of SQLAlchemy, IntelliQuery can connect to a wide variety of SQL databases (PostgreSQL, MySQL, SQLite, etc.) with minimal configuration changes.
+- **Agentic BI Orchestrator**: A high-level agent understands user intent, breaks down questions, and coordinates specialized sub-agents (for SQL and visualizations) to deliver a complete answer.
+- **Automated, Deep Context Awareness**: IntelliQuery connects directly to your database, analyzes the schema, and intelligently fetches distinct values for categorical columns (like `status`, `type`). This enriches the context, allowing the AI to generate queries with correct `WHERE` clauses (e.g., `WHERE status IN ('shipped', 'delivered')`).
+- **Integrated Visualization Agent**: Don't just get tables of data. Ask for a "bar chart," "line graph," or "pie chart," and the system will generate an interactive Plotly visualization for you.
+- **Robust SQL Generation with Reflection**: Choose the right SQL generation workflow for the job.
+- **Conversational Memory**: The system maintains a chat history, allowing users to ask follow-up questions (e.g., "Of those, which ones were sold last month?") and get contextually aware answers.
+- **Database Agnostic**: Built on top of SQLAlchemy, IntelliQuery can connect to a wide variety of SQL databases (PostgreSQL, MySQL, SQLite, etc.).
 
 ## Who is this for?
 
-- **Developers**: Quickly embed powerful natural language database querying into your applications.
+- **Developers**: Quickly embed powerful natural language data analysis and visualization into your applications.
 - **Data Teams**: Build internal tools that allow business analysts, product managers, and other stakeholders to self-serve their data needs without writing SQL.
 - **Enterprises**: Create a scalable, reliable layer for natural language interaction with your data warehouses and operational databases.
 
@@ -35,12 +42,11 @@ IntelliQuery solves this problem by providing a smart, agent-based system. It us
 
 ### 1. Installation
 
-Install IntelliQuery and its core dependencies using pip. For development, include the `[dev]` optional dependencies to get testing and linting tools.
+Install IntelliQuery and its core dependencies using pip.
 
 ```bash
 # For production use
 pip install "git+https://github.com/Muhammad-Abdelsattar/IntelliQuery.git#egg=intelliquery"
-
 ```
 
 ### 2. Configuration
@@ -55,126 +61,111 @@ DATABASE_URL="postgresql://username:password@localhost:5432/your_database"
 GOOGLE_API_KEY="your_google_api_key_here"
 ```
 
-Of course, you could use ENV variables instead of a `.env` file.
+The library is LLM-agnostic and uses the [Nexus LLM](https://github.com/Muhammad-Abdelsattar/nexus-llm) interface. You can configure multiple providers in a dictionary or a YAML file.
 
-The library is LLM-agnostic, so you can use any provider that using the [Nexus LLM](https://github.com/Muhammad-Abdelsattar/nexus-llm) interface, you could check it out to see how to configure it easily.
+> Note: You should install the database drivers for your chosen database. For example, to use PostgreSQL, you would run `pip install psycopg2-binary`.
 
 ### 3. Core Usage Example
 
-The following example demonstrates the complete end-to-end flow: connecting to the database, building the enriched context, and running the query orchestrator.
+The following example demonstrates the recommended end-to-end flow using the `create_intelliquery_system` facade to get an insight, the data, and a visualization.
 
 ```python
 import os
 from sqlalchemy import create_engine
-from nexus_llm import LLMInterface, load_settings
 from dotenv import load_dotenv
 
-# Import the core components from IntelliQuery
-from intelliquery import (
-    QueryOrchestrator,
-    DBContextAnalyzer,
-    DatabaseService,
-)
+# Import the main factory function from IntelliQuery
+from intelliquery import create_intelliquery_system, BIResult
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Setup your LLM interface (e.g., Gemini)
-llm_settings = load_settings({ "llm_providers": { "google_gemini": {
-    "class_path": "langchain_google_genai.ChatGoogleGenerativeAI",
-    "params": { "model": "gemini-1.5-flash", "google_api_key": os.getenv("GOOGLE_API_KEY"), "temperature": 0.1 }
-}}})
-llm_interface = LLMInterface(settings=llm_settings, provider_key="google_gemini")
-
-# Connect to your database using SQLAlchemy
+# Define LLM and Database configurations
+llm_settings = {
+    "llm_providers": {
+        "google_gemini": {
+            "class_path": "langchain_google_genai.ChatGoogleGenerativeAI",
+            "params": {
+                "model": "gemini-2.5-flash",
+                "google_api_key": os.getenv("GOOGLE_API_KEY"),
+                "temperature": 0.1,
+            },
+        }
+    }
+}
 engine = create_engine(os.getenv("DATABASE_URL"))
-db_service = DatabaseService(engine=engine,
-                             # schema="public", # Optional: Specify the schema to use
-                             )
 
-
-# This is a one-time (and cached) operation that analyzes your database.
-print("Building database context (may take a moment on first run)...")
-context_analyzer = DBContextAnalyzer(llm_interface=llm_interface, db_service=db_service)
-enriched_context = context_analyzer.build_context(
-    business_context="A 'premium' product is one with a price over $200."
+# Create the IntelliQuery System
+# This factory function initializes all components and analyzes database context on first run.
+print("Initializing IntelliQuery system...")
+intelliquery_system = create_intelliquery_system(
+    database_engine=engine,
+    llm_settings=llm_settings,
+    sql_workflow_type="reflection",  # Use "reflection" for quality, "simple" for speed
 )
-print("Context is ready!")
+print("System is ready!")
 
+# Ask a question that requires data, insight, and a visualization
+question = "What is the total revenue per product category? Also, create a bar chart to visualize this."
+chat_history = []  # Keep track of the conversation for follow-ups
 
-# Choose your workflow: "simple" for speed, "reflection" for quality.
-orchestrator = QueryOrchestrator(
-    llm_interface=llm_interface,
-    db_service=db_service,
-    workflow_type="reflection"  # Switch to "simple" for the direct workflow
-)
-
-# Ask a question!
-question = "Show me the names of all premium products in the 'Electronics' category."
-chat_history = [] # Keep track of the conversation for follow-ups
-
-result = orchestrator.run(
+result: BIResult = intelliquery_system.ask(
     question=question,
-    context=enriched_context,
     chat_history=chat_history,
-    auto_execute=True # Set to False to only generate and validate the SQL
 )
 
-# Handle the Result
+# Handle the rich BIResult object
 if result.status == "success":
-    print("\n--- Generated SQL ---")
-    print(result.sql_query)
-    print("\n--- Query Result ---")
-    print(result.dataframe.to_string())
+    print("\n--- Agent's Answer ---")
+    print(result.final_answer)
+
+    if result.sql_query:
+        print("\n--- Generated SQL ---")
+        print(result.sql_query)
+
+    if result.dataframe is not None:
+        print("\n--- Retrieved Data ---")
+        print(result.dataframe.to_string())
+
+    if result.visualization:
+        print("\n--- Visualization Generated ---")
+        print("A Plotly figure object has been created. To display it, you would use:")
+        print("# result.visualization.show()")
+        # To save it to a file:
+        # result.visualization.write_html("chart.html")
+
     # Update history for the next turn
-    chat_history.append((question, result.sql_query))
+    if result.final_answer:
+        chat_history.append((question, result.final_answer))
+
 elif result.status == "clarification_needed":
-    print(f"\nAgent needs clarification: {result.clarification_question}")
+    print(f"\nAgent needs clarification: {result.final_answer}")
 else:
     print(f"\nAn error occurred: {result.error_message}")
-```
 
-The previous is a fairly simple example. You can build much more commplex applications using it.
+```
 
 ## Core Concepts Explained
 
 ### The Context Engine
 
-The magic of IntelliQuery begins with the `DBContextAnalyzer`. When you call `build_context()`, it performs a sophisticated, multi-step process:
+The magic of IntelliQuery begins with the `DBContextAnalyzer`. When the system is first initialized, it performs a sophisticated, multi-step process to build a deep understanding of your data, which is then cached for performance. This involves schema extraction, intelligent LLM-based analysis to find categorical columns, and targeted queries to fetch their unique values, which are then injected back into the schema as comments.
 
-1.  **Schema Extraction**: It retrieves the raw DDL schema from your database.
-2.  **Intelligent Analysis (LLM Call)**: It sends this schema to an LLM, asking it to identify columns that are likely to be **categorical** and have a low number of unique values (low cardinality). It is explicitly instructed to ignore IDs, names, and numerical fields.
-3.  **Targeted Database Queries**: Based on the LLM's plan, it queries the database to fetch the actual distinct values for the identified columns (e.g., `SELECT DISTINCT status FROM orders`).
-4.  **Schema Augmentation**: It injects these values as comments directly into the DDL schema. This provides the main query-generation LLM with invaluable context, dramatically increasing the accuracy of its generated SQL.
+### The Agentic BI Workflow
 
-This entire enriched context is then cached, so this expensive analysis only needs to be performed once.
+The `IntelliQuery` system, created via `create_intelliquery_system`, is your primary interface. It manages a complete, multi-agent workflow:
 
-### The Orchestrator and Workflows
+1.  **Orchestration**: The top-level **BI Orchestrator** receives the user's question. It analyzes the intent and determines the sequence of actions needed.
 
-The `QueryOrchestrator` is your primary interface with the system. Its key responsibility is to manage the flow of information through a chosen workflow.
+2.  **Delegation to SQL Agent**: The orchestrator passes a context-aware question to the **SQL Agent**. This agent's sole focus is to generate the best possible SQL query. You configure its behavior (`simple` or `reflection`) when you create the main system.
 
-#### Simple Workflow
+3.  **Data Retrieval**: The generated SQL is executed, and the resulting data (as a pandas DataFrame) is returned to the orchestrator.
 
-When you initialize with `workflow_type="simple"`, the process is linear and fast:
+4.  **Delegation to Visualization Agent**: If the user's request included a visualization, the orchestrator now passes the DataFrame and the original intent to the **Visualization Agent**. This agent selects the best chart type and generates an interactive visualization object (e.g., a Plotly figure).
 
-1.  The orchestrator passes the question and context to the `generate_sql_node`.
-2.  The LLM generates an SQL query.
-3.  If `auto_execute` is `True`, the query is executed against the database.
-4.  If the execution fails, it can retry a few times, feeding the error back to the LLM for self-correction.
+5.  **Final Response Synthesis**: The orchestrator gathers all the artifacts—the natural language insight, the data, the SQL query, and the visualization—and packages them into a single, comprehensive `BIResult` object for you to use.
 
-#### Reflection Workflow
-
-When you initialize with `workflow_type="reflection"`, you activate a more deliberate and powerful process:
-
-1.  The `generate_sql_node` produces an initial SQL query.
-2.  The query is then passed to a **`reflection_node`**. This node invokes an LLM acting as a "Senior DBA" or "Performance Expert".
-3.  The reviewer agent assesses the query. It can either:
-    - **Approve** it, allowing it to proceed to execution.
-    - **Request Revisions**, providing specific, actionable feedback (e.g., "This `LEFT JOIN` is unnecessary; an `INNER JOIN` would be more performant.").
-4.  If revisions are requested, the feedback is sent back to the `generate_sql_node`, which creates a new, improved query. This loop can run a few times to refine the query.
-5.  Only the final, approved query is executed.
-
-This workflow trades a small amount of latency for a significant increase in the quality, correctness, and performance of the final SQL query.
+This multi-agent, orchestrated approach ensures that each part of the problem is handled by a specialized component, leading to higher quality and more comprehensive results than a simple text-to-SQL model.
 
 ## License
 

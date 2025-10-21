@@ -49,7 +49,7 @@ def render_bi_result(message: Dict[str, Any], regenerate_func: Callable):
         button_label = (
             "🔄 Refresh Data"
             if live_dataframe is not None or refreshed_results
-            else "▶️ Run Query"
+            else "▶️ Execute Step"
         )
         st.button(
             button_label,
