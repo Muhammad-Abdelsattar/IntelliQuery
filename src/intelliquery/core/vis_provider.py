@@ -57,9 +57,10 @@ def _register_intelliquery_template():
                 y=1.02,
                 xanchor="right",
                 x=1,
-                bgcolor="rgba(255,255,255,0.8)",
-                bordercolor="#cccccc",
-                borderwidth=1,
+                bgcolor="rgba(0,0,0,0)",  # Make background transparent
+                borderwidth=0,  # Remove the border
+                title_font=dict(size=13, color="#555555"),  # Style the legend title
+                font=dict(size=12),  # Control the font size of legend items
             ),
         )
     )
@@ -96,6 +97,7 @@ class PlotlyProvider(VisualizationProvider):
             # Register the professional template on initialization
             _register_intelliquery_template()
         except (IOError, json.JSONDecodeError) as e:
+            print(e)
             logger.error(f"Failed to load Plotly function mapping: {e}")
             self.vis_functions_mapping = {}
 
@@ -122,32 +124,49 @@ class PlotlyProvider(VisualizationProvider):
             if len(fig.data) <= 1:
                 fig.update_layout(showlegend=False)
 
-            if chart_type in ["bar_chart", "histogram"]:
-                # Add a subtle border to bars for better separation
-                fig.update_traces(marker_line_width=1, marker_line_color="white")
+            # --- CHART-SPECIFIC STYLING DEFAULTS ---
 
-                # Dynamic bar spacing based on number of categories
-                if "x" in kwargs and kwargs["x"] in dataframe.columns:
-                    num_categories = dataframe[kwargs["x"]].nunique()
-                    if num_categories > 10:
-                        # Reduce gap for many bars to avoid them being too thin
-                        fig.update_layout(bargap=0.15)
-                    else:
-                        # Default gap for fewer bars
-                        fig.update_layout(bargap=0.3)
+            if chart_type in ["bar_chart", "histogram"]:
+                # Set a fixed width to make bars substantial and solve grouping issues
+                fig.update_traces(width=0.8)
+                # Add a subtle border to bars for better separation
+                fig.update_traces(marker_line_width=1.5, marker_line_color="white")
 
             elif chart_type == "line_chart":
+                # Use markers for charts with fewer data points for clarity
                 mode = "lines+markers" if len(dataframe) <= 20 else "lines"
-                fig.update_traces(line=dict(width=2.5), mode=mode)
+                fig.update_traces(
+                    mode=mode, 
+                    line=dict(width=2.5), 
+                    marker=dict(size=8, line=dict(width=1, color='white'))
+                )
+
+            elif chart_type == "scatter_plot":
+                # Use opacity to reveal data density and a border to separate points
+                fig.update_traces(
+                    marker=dict(
+                        opacity=0.7,
+                        line=dict(width=1, color='white')
+                    )
+                )
 
             elif chart_type == "pie_chart":
+                # Style pie charts for readability and a modern look
+                num_slices = len(fig.data[0].values) if fig.data else 0
                 fig.update_traces(
                     textposition="inside",
                     textinfo="percent+label",
                     hoverinfo="label+percent+value",
                     marker=dict(line=dict(color="white", width=2)),
-                    pull=[0.05] * len(fig.data[0].values) if fig.data else [],
+                    # Slightly pull slices apart for separation
+                    pull=[0.02] * num_slices 
                 )
+                # Hide the legend since labels are inside the chart
+                fig.update_layout(showlegend=False)
+                
+            elif chart_type == "box_plot":
+                # Add a border to boxes for better definition
+                fig.update_traces(marker_line_width=1.5, marker_line_color="white")
 
         except Exception as e:
             logger.warning(
@@ -202,3 +221,4 @@ class PlotlyProvider(VisualizationProvider):
 
         logger.info(f"Successfully generated and styled Plotly chart '{chart_type}'.")
         return fig
+
