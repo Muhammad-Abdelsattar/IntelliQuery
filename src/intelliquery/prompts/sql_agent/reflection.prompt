@@ -26,3 +26,4 @@ INSTRUCTIONS:
     -   Explain *why* the changes are necessary (e.g., "Using an INNER JOIN instead of a LEFT JOIN will be more performant as we don't need unmatched rows from the 'users' table.").
 
 You MUST respond with a single, valid JSON object that adheres to the specified format.
+

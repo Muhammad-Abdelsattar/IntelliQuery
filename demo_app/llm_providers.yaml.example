@@ -1,0 +1,14 @@
+llm_providers:
+  google_gemini_flash:
+    type: google
+    params:
+      model: "gemini-2.5-flash"
+      google_api_key: "${env:GOOGLE_API_KEY}"
+      temperature: 0.1
+
+  google_gemini_lite:
+    type: google
+    params:
+      model: "gemini-2.5-flash-lite"
+      google_api_key: "${env:GOOGLE_API_KEY}"
+      temperature: 0.1

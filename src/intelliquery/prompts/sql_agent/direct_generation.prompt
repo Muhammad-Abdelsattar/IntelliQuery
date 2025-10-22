@@ -35,3 +35,4 @@ Based on the user's question below, generate the SQL query.
 
 USER QUESTION:
 {user_question}
+

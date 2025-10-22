@@ -8,18 +8,20 @@ version = "0.1.0"
 authors = [
   { name="Muhammad Abd Al-sattar", email="muhammadabdalsattar@gmail.com" },
 ]
-description = "An agentic AI toolkit for democratizing database access through natural language."
+description = "An agentic AI toolkit for democratizing BI and database access through natural language."
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Database",
+    "Topic :: Bussiness Intelligence",
 ]
 
 # Core Dependencies 
@@ -29,11 +31,13 @@ dependencies = [
     "psycopg2-binary",
     "pydantic>=2.0",
     "langgraph",
-    "simple-llm",
+    "nexus-llm @ git+https://github.com/Muhammad-Abdelsattar/nexus-llm.git",
     "langchain-google-genai",
     "typing-extensions",
     "sqlparse",
     "python-dotenv",
+    "pyyaml",
+    "plotly"
 ]
 
 
@@ -47,13 +51,6 @@ test = [
     "pytest>=7.0",
     "pytest-mock",
     "pytest-cov", 
-]
-
-# A comprehensive group for development, including testing tools and linters
-dev = [
-    "intelliquery[test]",
-    "ruff",             
-    "ipykernel",       
 ]
 
 # Setuptools Configuration
@@ -75,35 +72,3 @@ dotenv_files = [
     ".env",
 ]
 addopts = "-ra --strict-markers --import-mode=importlib"
-
-
-[tool.coverage.run]
-# Measure coverage for the code inside your 'src/intelliquery' directory.
-source = ["src.intelliquery"]
-# Exclude files that are not useful to measure coverage on.
-omit = [
-    "*/__init__.py",
-]
-
-[tool.coverage.report]
-# Show which lines were not executed in the coverage report.
-show_missing = true
-# Enforce a quality gate: the test suite will fail if coverage drops below 85%.
-fail_under = 85
-
-
-[tool.ruff]
-line-length = 88
-# Use the same Python version as the project for accurate linting.
-target-version = "py39"
-
-[tool.ruff.lint]
-# A good starting set of rules:
-# E, W: pycodestyle errors and warnings
-# F: Pyflakes (errors)
-# I: isort (import sorting)
-# UP: pyupgrade (modernize code syntax)
-select = ["E", "W", "F", "I", "UP"]
-
-# To use the formatter: ruff format .
-# To run the linter and auto-fix: ruff check --fix .

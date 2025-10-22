@@ -1,12 +1,8 @@
-# IntelliQuery Demo Application: User Guide
+# IntelliQuery Demo Application
 
-Welcome to IntelliQuery! This guide will walk you through the features of the IntelliQuery demo application and show you how to connect to your database and start asking questions in plain English.
+This interactive tool showcases the power of using a natural language interface to query your SQL databases. Ask questions in plain English, and our AI-powered agent will translate them into SQL, execute the query, and deliver the results.
 
-## 1. What is IntelliQuery?
-
-IntelliQuery is an intelligent AI assistant designed to help you interact with your SQL databases using natural language. Instead of writing complex SQL code, you can simply ask questions, and IntelliQuery's advanced agent will translate your request into a precise, performant SQL query, run it, and show you the results.
-
-**Key Features:**
+## Key Features
 
 - **Natural Language to SQL:** Ask questions like "Which 5 customers had the highest sales last month?"
 - **Smart Context Analysis:** The agent analyzes your database schema to understand table relationships, column types, and even the kinds of low cardinality categorical values stored in certain columns.
@@ -14,95 +10,107 @@ IntelliQuery is an intelligent AI assistant designed to help you interact with y
 - **Full Transparency:** See the agent's reasoning and the exact SQL query it generated for every answer, building trust and allowing for verification.
 - **Interactive Chat Interface:** Engage in a conversational back-and-forth, asking follow-up questions to refine your results.
 
-## 2. Getting Started: The Sidebar
+## Getting Started
 
-The sidebar is your main control panel, accessible from every page. It's where you manage connections and conversations.
+### Prerequisites
 
-![sidebar](./assets/sidebar.png)
+- Python 3.10+
+- An SQL database (PostgreSQL, MySQL, SQLite, etc.)
 
-### Database Connection
+### Installation
 
-This is the most important section. An active connection is required to chat with your data.
+1.  **Clone the repository:**
 
-- **Dropdown Menu:** Select from a list of your saved database connections. The currently active one will be displayed.
-- **Manage Connections Button:** This will take you to the **Connection Manager** page, where you can add new connections or edit existing ones.
+    ```bash
+    git clone https://github.com/muhammad-abdelsattar/intelliquery.git
+    cd intelliquery
+    ```
 
-### Chat History
+2.  **Create a virtual environment (recommended):**
 
-- **➕ New Chat Button:** Starts a fresh conversation with the currently active database connection.
-- **Load Past Chat Expander:** Click to view and load your previous conversations. The app will automatically restore the chat history and its associated database connection.
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    ```
 
-## 3. Managing Your Connections
+3.  **Install the core IntelliQuery library:**
+    From the root of the project (`intelliquery/`), install the library in editable mode. This makes the demo app aware of the main toolkit's code.
 
-Before you can start a chat, you need to tell IntelliQuery how to connect to your database. This is done on the **Connection Manager** page.
+    ```bash
+    pip install -e .
+    ```
 
- <!-- Screenshot of the Connection Manager page -->
+4.  **Install Demo App dependencies:**
+    Now, navigate to the demo application directory and install its specific requirements.
 
-### Adding a New Connection
+    ```bash
+    cd demo_app
+    pip install -r requirements.txt
+    ```
 
-1.  Navigate to the **Connection Manager** page from the sidebar.
-2.  Fill out the "Add New Connection" form on the right:
-    - **Connection Name:** A friendly, unique name (e.g., "Production Analytics DB").
-    - **Database Dialect:** The type of your database (e.g., PostgreSQL).
-    - **Database URL:** The connection string for your database.
-    - **Include Tables (Optional):** A comma-separated list of tables you want the agent to focus on. If left blank, all tables will be included.
-    - **Default Business Context (Optional):** Provide any business rules or definitions here (e.g., "A 'premium' customer is one who has spent over $1000.").
+5.  **Configure your LLM providers:**
+    In the `demo_app` directory, rename `llm_providers.yaml.example` to `llm_providers.yaml`. Edit this file to configure your preferred LLM provider (e.g., Google Gemini, OpenAI). You will need to set the corresponding API key (e.g., `GOOGLE_API_KEY`) as an environment variable or in a `.env` file within the `demo_app` directory.
 
-### Securing Your Credentials
+6.  **Set up your database credentials:**
+    For security, **do not** write your database password directly into the connection URL. Instead, use Streamlit's Secrets management.
 
-For security, **do not** write your database password directly into the URL. Instead, use Streamlit's Secrets management.
+    1.  Create a file at `.streamlit/secrets.toml`.
+    2.  Store your credentials there, like this: `DB_PASSWORD = "my_secret_password"`.
+    3.  In the Database URL field in the app, reference the secret using the `${...}` syntax:
+        `postgresql://user:${DB_PASSWORD}@host:port/dbname`
 
-1.  Create a file at `.streamlit/secrets.toml`.
-2.  Store your credentials there, like this: `DB_PASSWORD = "my_secret_password"`.
-3.  In the Database URL field, reference the secret using the `${...}` syntax:
-    `postgresql://user:${DB_PASSWORD}@host:port/dbname`
+### Running the Application
 
-### Saving and Analyzing
+Once you have installed the dependencies and configured your settings, run the application from the `demo_app` directory:
 
-Clicking **"Save & Analyze Connection"** will:
+```bash
+streamlit run main.py
+```
 
-1.  Test the database connection.
-2.  Run the AI agent to analyze your database schema. This builds a cached "enriched context" that helps the agent generate better queries. This step may take a moment on the first run for a new connection.
-3.  Save the connection configuration for future use.
+## Usage
 
-## 4. The Chat Interface
+### 1. Manage Connections
 
-This is where the magic happens! Once you have an active connection, you can start asking questions on the **Chat** page.
+- Before you can chat with your data, you need to add a database connection.
+- Navigate to the **Manage Connections** page from the sidebar.
+- Fill out the form to add a new connection, providing a name, dialect, URL, and optional settings like included tables and business context.
+- Click **Save & Analyze Connection**. This will test the connection and analyze your database schema to build an "enriched context" for the AI agent.
 
- <!-- Screenshot of the Chat Interface -->
+### 2. Start Chatting
 
-### Session Controls (in the Sidebar)
+- Once a connection is active, go to the **Chat** page.
+- Use the sidebar to configure the session controls:
+    - **AI Model:** Choose from the LLMs you configured.
+- Type your question in the chat input box and press Enter.
 
-These controls apply only to the current chat session.
+### 3. Understand the Results
 
-- **Agent Mode:**
-    - **Execute:** The default mode. The agent generates SQL and immediately runs it against your database to fetch results.
-    - **Plan:** A safe mode. The agent will generate and validate the SQL query but will **not** execute it. This is useful for reviewing the agent's plan before running a potentially long query.
-- **Workflow:**
-    - **Simple:** The agent generates a query and executes it.
-    - **Reflection:** A more advanced, two-step process. The first AI generates a query, and a second "expert" AI reviews and refines it for accuracy and performance before it's used.
-- **Current Chat's Business Context:** You can add or modify business rules that apply _only_ to the current conversation. This overrides the default context set on the connection.
+- The agent will show you the data in an interactive table and an interactive chart if applicable.
+- You can download the results as a CSV file.
+- The **Show Details** expander reveals the agent's reasoning and the final SQL query.
 
-### Asking a Question
+## Project Structure
 
-1.  Type your question in plain English into the input box at the bottom.
-2.  Press Enter.
-3.  Watch the real-time status updates as the agent works through its process (generating, reviewing, executing).
+```
+/
+├───.connections.json           # Stores saved database connections
+├───llm_providers.yaml          # Configuration for LLM providers
+├───main.py                     # Main Streamlit application file
+├───README.md                   # This file
+├───state.py                    # Manages the application's session state
+├───.cache/                     # Caches database context analysis
+├───.chat_history/              # Stores chat history for each session
+├───services/
+│   ├───chat_service.py         # Handles chat history and conversation logic
+│   ├───connection_service.py   # Manages database connections and credentials
+│   └───llm_service.py          # Interface for interacting with LLMs
+└───ui_components/
+    ├───chat_renderer.py        # Renders the chat messages and results
+    └───sidebar.py              # Builds the main navigation sidebar
+```
 
-### Understanding the Results
-
-The agent's response is more than just data.
-
-- **The Data:** If your query returns data, it will be displayed in an interactive table.
-- **Download as CSV:** A button located directly below the data table allows you to download the results for use in other tools.
-- **Show Details Expander:**
-    - **Agent's Reasoning Tab:** Read the agent's step-by-step explanation of how it understood your question and constructed the SQL query.
-    - **SQL Query Tab:** View the final, beautifully formatted SQL query that was executed.
-
-## 5. Tips for a Great Experience
+## Tips for a Great Experience
 
 - **Be Specific:** The more specific your question, the better the result. Instead of "show users," try "show me the email addresses of the first 5 users who signed up in May 2024."
 - **Use Follow-up Questions:** The agent remembers the context of the conversation. If you get a list of products, you can ask a follow-up like, "Of those, which one has the highest profit?"
 - **Leverage Business Context:** Use the context box to teach the agent your company's jargon. Defining terms like "ARR" or "active user" will dramatically improve the agent's accuracy.
-
----

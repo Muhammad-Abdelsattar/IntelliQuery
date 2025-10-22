@@ -1,11 +1,11 @@
 import streamlit as st
-from state import AppState, get_state
+from state import get_state
 from services import chat_service
 
 
 def build_sidebar():
     """
-    Builds the main sidebar, now driving the state of the single-page app.
+    Builds the main sidebar, driving the state of the single-page app.
     """
     state = get_state()
 
@@ -13,8 +13,6 @@ def build_sidebar():
         st.header("IntelliQuery")
         st.markdown("Your AI Database Assistant")
 
-        # Page Navigation
-        # Use buttons to set the page state, which the main app will use to render
         if st.button("🏠 Home", use_container_width=True):
             state.set_page("home")
             st.rerun()
@@ -24,19 +22,16 @@ def build_sidebar():
 
         st.divider()
 
-        # Connection Selection
         st.subheader("Database Connection")
         connections = state.connections
         connection_options = {conn["name"]: conn for conn in connections}
 
-        # Initialize confirmation state
         if "pending_connection_change" not in st.session_state:
             st.session_state.pending_connection_change = None
 
-        # Handle pending connection change confirmation
         if st.session_state.pending_connection_change:
             st.warning(
-                "Changing connections will start a new chat session. Your current chat will be lost. Proceed?"
+                "Changing connections will start a new chat session. Proceed?"
             )
             c1, c2 = st.columns(2)
             if c1.button("✅ Proceed", use_container_width=True):
@@ -65,7 +60,6 @@ def build_sidebar():
         )
 
         if selected_name and selected_name != current_conn_name:
-            # If chat is active, ask for confirmation. Otherwise, switch directly.
             if state.chat_history:
                 st.session_state.pending_connection_change = selected_name
                 st.rerun()
@@ -76,7 +70,6 @@ def build_sidebar():
 
         st.divider()
 
-        # Chat History Management
         st.subheader("Chat History")
         if st.button("➕ New Chat", use_container_width=True):
             if not state.selected_connection:
@@ -95,7 +88,7 @@ def build_sidebar():
                     session["name"], key=session["id"], use_container_width=True
                 ):
                     conn_name, history = chat_service.load_chat_history(session["id"])
-                    if state.select_connection(conn_name):
+                    if conn_name and state.select_connection(conn_name):
                         state.chat_history = history
                         state.current_chat_id = session["id"]
                         state.set_page("chat")
@@ -105,7 +98,6 @@ def build_sidebar():
                             f"Connection '{conn_name}' for this chat could not be found."
                         )
 
-        # Session controls are now part of the main sidebar, shown only on the chat page
         if state.page == "chat":
             st.divider()
             st.subheader("Session Controls")
@@ -128,28 +120,27 @@ def build_sidebar():
 
                 if selected_provider_key != state.selected_llm_provider:
                     state.selected_llm_provider = selected_provider_key
-                    state.services_initialized = False
+                    state.services_initialized = False # Force re-init
                     st.rerun()
 
-            state.workflow_mode = st.radio(
-                "Workflow", ["simple", "reflection"], index=0, horizontal=True
-            )
-
-            # Map internal agent mode values to user-friendly labels
-            agent_mode_options = {"Automatic": "execute", "Manual Approval": "plan"}
-            # Get current index based on state
-            current_agent_mode_label = [k for k, v in agent_mode_options.items() if v == state.agent_mode][0]
-            available_labels = list(agent_mode_options.keys())
-
-            selected_label = st.radio(
-                "Execution Mode",
-                options=available_labels,
-                index=available_labels.index(current_agent_mode_label),
+            st.markdown("**Agent Workflow**")
+            workflow_options = {"Simple": "simple", "Reflection": "reflection"}
+            current_workflow_label = [k for k, v in workflow_options.items() if v == state.workflow_mode][0]
+            
+            selected_workflow_label = st.radio(
+                "Workflow",
+                options=list(workflow_options.keys()),
+                index=list(workflow_options.keys()).index(current_workflow_label),
                 horizontal=True,
-                help="**Automatic**: The AI will run queries instantly. **Manual Approval**: The AI will generate a query and wait for you to run it.",
+                help="**Simple**: A single AI agent generates the query. **Reflection**: A second AI agent reviews and refines the query for accuracy."
             )
-            # Update state with the internal value
-            state.agent_mode = agent_mode_options[selected_label]
+            
+            selected_workflow = workflow_options[selected_workflow_label]
+            if selected_workflow != state.workflow_mode:
+                state.workflow_mode = selected_workflow
+                state.services_initialized = False # Force re-init
+                st.rerun()
+
 
             with st.expander("**Current Chat's Business Context**", expanded=False):
                 st.info("Define business rules for this session only.", icon="ℹ️")

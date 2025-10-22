@@ -19,11 +19,8 @@ class AppState:
         self.current_chat_id: Optional[str] = None
         self.business_context: str = ""
 
-        # Agent & Core Services (placeholders, to be initialized)
-        self.db_service: Optional[Any] = None
-        self.context_analyzer: Optional[Any] = None
-        self.query_orchestrator: Optional[Any] = None
-        self.enriched_context: Optional[Any] = None
+        # IntelliQuery System (replaces individual services)
+        self.intelliquery_system: Optional[Any] = None
         self.services_initialized: bool = False
 
         # LLM Management
@@ -33,7 +30,6 @@ class AppState:
         # UI control
         self.active_page: str = "home"
         self.workflow_mode: str = "simple"
-        self.agent_mode: str = "execute"
 
     def initialize_connections(self):
         """Loads connections from the service layer into the state."""
@@ -45,7 +41,6 @@ class AppState:
         self.page = page_name
         self.active_page = page_name
 
-        # If navigating to a new chat, ensure a chat ID is set
         if page_name == "chat" and not self.current_chat_id:
             self.start_new_chat()
 
@@ -53,9 +48,7 @@ class AppState:
         """Initializes a new chat session."""
         self.current_chat_id = chat_service.get_new_chat_id()
         self.chat_history = []
-        # Reset services so they re-initialize for the potentially new connection context
         self.services_initialized = False
-        # Update URL to reflect the new chat
         st.query_params["chat_id"] = self.current_chat_id
 
     def select_connection(self, connection_name: str):
@@ -68,7 +61,6 @@ class AppState:
         )
         if conn_to_select:
             self.selected_connection = conn_to_select
-            # Reset chat and services when connection changes
             self.start_new_chat()
             return True
         return False
@@ -79,7 +71,6 @@ class AppState:
         self.connections = connection_service.load_connections()
 
 
-# The key to our new state management: a single function to get the state
 _STATE_KEY = "app_state"
 
 

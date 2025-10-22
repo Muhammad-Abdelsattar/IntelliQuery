@@ -1,19 +1,16 @@
 from __future__ import annotations
 import logging
-from typing import List, Tuple, Optional, Union, Literal
+from typing import List, Tuple, Optional, Union
 
-from nexus_llm import LLMInterface
-
-from .core.database import DatabaseService
-from .models.public import SQLPlan, SQLResult, EnrichedDatabaseContext
-from .models.state import SQLAgentState
-from .workflows.simple import SimpleWorkflow
-from .workflows.reflection import ReflectionWorkflow
+from ..core.database import DatabaseService
+from ..models.sql_agent.public import SQLPlan, SQLResult, EnrichedDatabaseContext
+from ..models.sql_agent.state import SQLAgentState
+from ..workflows.sql_agent.base import BaseWorkflow
 
 logger = logging.getLogger(__name__)
 
 
-class QueryOrchestrator:
+class SQLAgent:
     """
     A high-level orchestrator for text-to-SQL workflows.
     It initializes and runs a selected workflow (e.g., simple, reflection)
@@ -23,24 +20,14 @@ class QueryOrchestrator:
 
     def __init__(
         self,
-        llm_interface: LLMInterface,
         db_service: DatabaseService,
-        workflow_type: Literal["simple", "reflection"] = "simple",
+        workflow: BaseWorkflow,
         max_attempts: int = 3,
         max_reflection_attempts: int = 2,
     ):
-        self.llm_interface = llm_interface
         self.db_service = db_service
         self.max_attempts = max_attempts
         self.max_reflection_attempts = max_reflection_attempts
-
-        if workflow_type == "simple":
-            workflow = SimpleWorkflow(llm_interface, db_service)
-        elif workflow_type == "reflection":
-            workflow = ReflectionWorkflow(llm_interface, db_service)
-        else:
-            raise ValueError(f"Unknown workflow type: {workflow_type}")
-
         self.app = workflow.compile()
 
     def _prepare_initial_state(
