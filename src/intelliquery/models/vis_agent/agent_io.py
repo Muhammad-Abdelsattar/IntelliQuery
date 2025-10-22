@@ -1,6 +1,6 @@
 import json
 from typing import Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class VisualizationToolset(BaseModel):
@@ -14,7 +14,7 @@ class VisualizationToolset(BaseModel):
         description="The selected visualization tool and its arguments, conforming to the framework.",
     )
 
-    @validator('visualization_toolset', pre=True)
+    @field_validator('visualization_toolset', mode='before')
     def parse_json_string(cls, v: Any) -> Any:
         if isinstance(v, str):
             try:
