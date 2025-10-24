@@ -136,34 +136,28 @@ class PlotlyProvider(VisualizationProvider):
                 # Use markers for charts with fewer data points for clarity
                 mode = "lines+markers" if len(dataframe) <= 20 else "lines"
                 fig.update_traces(
-                    mode=mode, 
-                    line=dict(width=2.5), 
-                    marker=dict(size=8, line=dict(width=1, color='white'))
+                    mode=mode,
+                    line=dict(width=2.5),
+                    marker=dict(size=8, line=dict(width=1, color="white")),
                 )
 
             elif chart_type == "scatter_plot":
                 # Use opacity to reveal data density and a border to separate points
                 fig.update_traces(
-                    marker=dict(
-                        opacity=0.7,
-                        line=dict(width=1, color='white')
-                    )
+                    marker=dict(opacity=0.7, line=dict(width=1, color="white"))
                 )
 
             elif chart_type == "pie_chart":
-                # Style pie charts for readability and a modern look
-                num_slices = len(fig.data[0].values) if fig.data else 0
                 fig.update_traces(
                     textposition="inside",
                     textinfo="percent+label",
                     hoverinfo="label+percent+value",
                     marker=dict(line=dict(color="white", width=2)),
-                    # Slightly pull slices apart for separation
-                    pull=[0.02] * num_slices 
+                    pull=[0.05] * len(fig.data[0].values) if fig.data else [],
                 )
-                # Hide the legend since labels are inside the chart
+
                 fig.update_layout(showlegend=False)
-                
+
             elif chart_type == "box_plot":
                 # Add a border to boxes for better definition
                 fig.update_traces(marker_line_width=1.5, marker_line_color="white")
@@ -221,4 +215,3 @@ class PlotlyProvider(VisualizationProvider):
 
         logger.info(f"Successfully generated and styled Plotly chart '{chart_type}'.")
         return fig
-

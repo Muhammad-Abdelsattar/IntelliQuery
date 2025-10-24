@@ -3,17 +3,22 @@ import time
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 from typing import Dict, Any
+from PIL import Image
 
 from state import get_state, AppState
 from services import connection_service, chat_service
 from ui_components import sidebar, chat_renderer
+from streamlit_extras.bottom_container import bottom
 
 from intelliquery import create_intelliquery_system, BIResult
 from nexus_llm import load_settings
 
 load_dotenv()
 
-st.set_page_config(page_title="IntelliQuery", page_icon="🧠", layout="wide")
+page_icon = Image.open("assets/icon.png")
+
+
+st.set_page_config(page_title="IntelliQuery", page_icon=page_icon, layout="wide")
 
 
 def render_home_page():
@@ -175,11 +180,68 @@ def render_chat_page():
         st.stop()
     if not state.services_initialized:
         initialize_chat_services(state)
-    st.title("💬 IntelliQuery Chat")
+    # st.title("💬 IntelliQuery Chat")
+
     for message in state.chat_history:
         chat_renderer.render_message(message, regenerate_bi_output)
-    if prompt := st.chat_input("Ask a question about your data..."):
+
+    with bottom():
+        col1, col2 = st.columns([1, 4], vertical_alignment="center")
+        with col1:
+            with st.popover("Chat Controls", use_container_width=True):
+                st.markdown("**Chat Controls**")
+
+                if state.all_llm_providers:
+                    provider_keys = list(state.all_llm_providers.llm_providers.keys())
+                    current_provider = state.selected_llm_provider or (
+                        provider_keys[0] if provider_keys else None
+                    )
+
+                    selected_provider_key = st.selectbox(
+                        label="Choose a model",
+                        options=provider_keys,
+                        index=(
+                            provider_keys.index(current_provider)
+                            if current_provider in provider_keys
+                            else 0
+                        ),
+                        label_visibility="collapsed",
+                        key="model",  # This links the selectbox to st.session_state.model
+                    )
+
+                    if selected_provider_key != state.selected_llm_provider:
+                        state.selected_llm_provider = selected_provider_key
+                        state.services_initialized = False  # Force re-init
+                        st.rerun()
+
+                with st.expander("**Current Chat's Business Context**", expanded=False):
+                    st.info("Define business rules for this session only.", icon="ℹ️")
+                    default_context = (
+                        state.selected_connection.get("business_context", "")
+                        if state.selected_connection
+                        else ""
+                    )
+                    state.business_context = st.text_area(
+                        "Context",
+                        value=state.business_context or default_context,
+                        height=200,
+                        label_visibility="collapsed",
+                    )
+                # Form to change model and temperature
+                st.caption(
+                    f":material/neurology: Current Model: {st.session_state.model}"
+                )
+                st.caption(
+                    f":material/database: Current Connection: {state.selected_connection["name"]}"
+                )
+
+        with col2:
+            prompt = st.chat_input("Ask a question about your data...")
+
+    if prompt:
         handle_user_prompt(state, prompt)
+    # if prompt := st.chat_input("Ask a question about your data..."):
+    #     handle_user_prompt(state, prompt)
 
 
 def initialize_chat_services(state: AppState):
@@ -235,35 +297,36 @@ def regenerate_bi_output(message_timestamp: float, sql_query: str, vis_params: D
 def handle_user_prompt(state: AppState, prompt: str):
     """Handles the logic for processing a user's chat input."""
     user_message = {"role": "user", "content": prompt, "timestamp": time.time()}
-    state.chat_history.append(user_message)
     chat_renderer.render_message(user_message, regenerate_bi_output)
 
-    with st.chat_message("assistant"):
-        with st.status("Agent is thinking...", expanded=True) as status:
-            result = state.intelliquery_system.ask(
-                question=prompt,
-                chat_history=chat_service.get_conversation_history(state.chat_history),
-                business_context=state.business_context,
-                llm_key=state.selected_llm_provider,
-            )
-            response_for_storage = process_agent_result_for_storage(result, status)
-            response_for_storage["timestamp"] = time.time()
-            response_for_display = response_for_storage.copy()
-            if result.status == "success":
-                response_for_display["data"]["dataframe"] = result.dataframe
-                response_for_display["data"]["visualization"] = result.visualization
+    # with st.chat_message("assistant"):
+    # with st.spinner("Agent is working..."):
+    result = state.intelliquery_system.ask(
+        question=prompt,
+        chat_history=chat_service.get_conversation_history(state.chat_history),
+        business_context=state.business_context,
+        llm_key=state.selected_llm_provider,
+    )
+    response_for_storage = process_agent_result_for_storage(result)
+    response_for_storage["timestamp"] = time.time()
+    response_for_display = response_for_storage.copy()
+    if result.status == "success":
+        response_for_display["data"]["dataframe"] = result.dataframe
+        response_for_display["data"]["visualization"] = result.visualization
 
     chat_renderer.render_message(response_for_display, regenerate_bi_output)
+    state.chat_history.append(user_message)
     state.chat_history.append(response_for_storage)
     chat_service.save_chat_history(
         state.current_chat_id, state.selected_connection["name"], state.chat_history
     )
 
 
-def process_agent_result_for_storage(result: BIResult, status) -> Dict[str, Any]:
+# def process_agent_result_for_storage(result: BIResult, status) -> Dict[str, Any]:
+def process_agent_result_for_storage(result: BIResult) -> Dict[str, Any]:
     """Returns a message dict suitable for saving (no live objects)."""
     if result.status == "success":
-        status.update(label="Agent answered successfully!", state="complete")
+        # status.update(label="Agent answered successfully!", state="complete")
         return {
             "role": "assistant",
             "content_type": "bi_result",
@@ -275,14 +338,14 @@ def process_agent_result_for_storage(result: BIResult, status) -> Dict[str, Any]
             },
         }
     elif result.status == "clarification_needed":
-        status.update(label="Agent needs more information.", state="complete")
+        # status.update(label="Agent needs more information.", state="complete")
         return {
             "role": "assistant",
             "content_type": "text",
             "content": result.final_answer,
         }
     else:
-        status.update(label="An error occurred.", state="error")
+        # status.update(label="An error occurred.", state="error")
         return {
             "role": "assistant",
             "content_type": "error",

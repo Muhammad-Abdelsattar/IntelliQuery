@@ -6,7 +6,11 @@ import sqlparse
 def render_message(message: Dict[str, Any], regenerate_func: Callable):
     """Renders a single chat message."""
     role = message.get("role")
-    with st.chat_message(role):
+    if role == "user":
+        avatar_icon = "./assets/user_avatar.png"
+    else:
+        avatar_icon = "./assets/icon.png"
+    with st.chat_message(role, avatar=avatar_icon):
         content_type = message.get("content_type", "text")
 
         if role == "user":
